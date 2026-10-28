@@ -4,6 +4,8 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 
+import SearchDialog from "@/components/search";
+
 import appCss from "@/styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -27,6 +29,7 @@ export const Route = createRootRoute({
 });
 
 const theme = { defaultTheme: "dark" } as const;
+const search = { SearchDialog } as const;
 
 function RootDocument({ children }: { children: ReactNode }) {
   return (
@@ -35,7 +38,9 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body className="flex min-h-screen flex-col">
-        <RootProvider theme={theme}>{children}</RootProvider>
+        <RootProvider theme={theme} search={search}>
+          {children}
+        </RootProvider>
         <Scripts />
       </body>
     </html>
