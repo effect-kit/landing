@@ -9,6 +9,7 @@ import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layo
 
 import { useMDXComponents } from "@/components/mdx";
 import { baseOptions } from "@/lib/layout.shared";
+import { getPackage } from "@/lib/packages";
 import { docs, source } from "@/lib/source";
 import { tabs } from "@/lib/tabs";
 
@@ -20,6 +21,7 @@ const serverLoader = createServerFn({ method: "GET" })
 
     return {
       path: page.path,
+      packageSlug: page.slugs[0],
       pageTree: await source.serializePageTree(source.getPageTree()),
     };
   });
@@ -53,10 +55,10 @@ function Content({ path }: { path: string }) {
 }
 
 function Page() {
-  const { path, pageTree } = useFumadocsLoader(Route.useLoaderData());
+  const { path, pageTree, packageSlug } = useFumadocsLoader(Route.useLoaderData());
 
   return (
-    <DocsLayout {...baseOptions()} tree={pageTree} tabs={tabs}>
+    <DocsLayout {...baseOptions(getPackage(packageSlug))} tree={pageTree} tabs={tabs}>
       <Suspense>
         <Content path={path} />
       </Suspense>
