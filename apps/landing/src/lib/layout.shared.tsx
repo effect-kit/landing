@@ -1,6 +1,6 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
-import { Logo } from "@/components/logo";
+import { EffectKitLogo } from "@/components/logos";
 
 import { appName, gitConfig } from "./shared";
 
@@ -9,7 +9,7 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <>
-          <Logo className="size-5" />
+          <EffectKitLogo className="size-6" />
           <span className="font-semibold tracking-tight">{appName}</span>
         </>
       ),

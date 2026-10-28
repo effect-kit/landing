@@ -18,7 +18,10 @@ export const Route = createRootRoute({
         content: "Composable, open-source tooling for Effect.",
       },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/svg+xml", href: "/logo.svg" },
+    ],
   }),
   component: RootComponent,
 });
