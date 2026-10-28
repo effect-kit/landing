@@ -18,9 +18,11 @@ export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
       title: (
         <>
           <Logo className="size-6" />
-          <span className="font-semibold tracking-tight">
+          <span className="font-semibold">
             {appName}
-            {pkg ? <span className="ms-1.5 text-fd-muted-foreground">{pkg.name}</span> : null}
+            {pkg ? (
+              <span className="ms-1.5 font-medium text-fd-muted-foreground">{pkg.name}</span>
+            ) : null}
           </span>
         </>
       ),
@@ -31,7 +33,7 @@ export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
           {
             type: "main",
             on: "menu",
-            text: "GitHub",
+            text: pkg.repo,
             url: getRepoUrl(pkg),
             icon: <GitHubIcon />,
             external: true,
