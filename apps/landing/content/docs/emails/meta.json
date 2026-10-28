@@ -1,0 +1,7 @@
+{
+  "title": "Emails",
+  "description": "Typed email delivery",
+  "icon": "Mail",
+  "root": true,
+  "pages": ["index", "..."]
+}
