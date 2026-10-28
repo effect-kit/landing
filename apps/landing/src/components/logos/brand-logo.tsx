@@ -26,6 +26,7 @@ interface BrandLogoProps extends LogoProps {
   readonly markViewBox: string;
   /** SVG path data for the glyph, in artboard coordinates. */
   readonly glyph: string;
+  readonly glyphFillRule?: "nonzero" | "evenodd";
 }
 
 export function BrandLogo({
@@ -34,6 +35,7 @@ export function BrandLogo({
   size,
   markViewBox,
   glyph,
+  glyphFillRule,
   ...props
 }: BrandLogoProps) {
   const isBadge = variant === "badge";
@@ -48,7 +50,11 @@ export function BrandLogo({
     >
       {title ? <title>{title}</title> : null}
       {isBadge ? <path fill={logoColors.background} d={`M0 0h${size}v${size}H0z`} /> : null}
-      <path fill={isBadge ? logoColors.foreground : "currentColor"} d={glyph} />
+      <path
+        fill={isBadge ? logoColors.foreground : "currentColor"}
+        fillRule={glyphFillRule}
+        d={glyph}
+      />
     </svg>
   );
 }

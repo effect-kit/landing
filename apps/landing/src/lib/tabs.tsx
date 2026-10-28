@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 
 import type { GetLayoutTabsOptions } from "fumadocs-ui/layouts/shared";
 
-import { EmailsLogo, type LogoProps, RedisLogo } from "@/components/logos";
+import { EmailsLogo, type LogoProps, RedisLogo, StorageLogo } from "@/components/logos";
 
 import { docsRoute } from "./shared";
 
@@ -10,6 +10,8 @@ import { docsRoute } from "./shared";
 const logos: Record<string, ComponentType<LogoProps>> = {
   redis: RedisLogo,
   emails: EmailsLogo,
+  // Not published yet; picks up its logo once `content/docs/storage` exists.
+  storage: StorageLogo,
 };
 
 export const tabs: GetLayoutTabsOptions = {
@@ -20,7 +22,7 @@ export const tabs: GetLayoutTabsOptions = {
 
     return {
       ...option,
-      icon: <Logo variant="badge" className="size-full rounded-md ring-1 ring-fd-border" />,
+      icon: <Logo className="size-full" />,
     };
   },
 };
