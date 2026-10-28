@@ -44,3 +44,9 @@ Thumbs.db
 !.vscode/settings.json
 *.swp
 *.swo
+
+# TanStack Start and Fumadocs generated output
+.output/
+.nitro/
+.tanstack/
+.source/

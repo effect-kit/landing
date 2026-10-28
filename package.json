@@ -23,13 +23,14 @@
     "dev": "turbo run dev",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "lint": "oxlint --deny-warnings .",
-    "lint:fix": "oxlint --fix .",
+    "lint": "pnpm lint:root && turbo run lint",
+    "lint:fix": "oxlint --fix . && turbo run lint -- --fix",
     "prepare": "lefthook install",
     "test": "turbo run test",
     "typecheck": "pnpm typecheck:root && turbo run typecheck",
     "typecheck:root": "tsc --noEmit -p tsconfig.json",
-    "ci:check": "pnpm check"
+    "ci:check": "pnpm check",
+    "lint:root": "oxlint --deny-warnings *.config.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "catalog:",
