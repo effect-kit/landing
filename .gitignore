@@ -1,0 +1,46 @@
+# Dependencies and package manager caches
+node_modules/
+.pnpm-store/
+
+# Build output and task caches
+dist/
+build/
+out/
+.next/
+.astro/
+.vercel/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Test output
+coverage/
+test-results/
+playwright-report/
+
+# Local research must never be committed
+/research/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Archives and logs
+*.tgz
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
