@@ -2,17 +2,5 @@
   "title": "Emails",
   "description": "Typed email delivery",
   "root": true,
-  "pages": [
-    "index",
-    "---Getting Started---",
-    "installation",
-    "quick-start",
-    "---Guides---",
-    "providers",
-    "templates",
-    "batch-sending",
-    "testing",
-    "---Reference---",
-    "errors"
-  ]
+  "pages": ["index", "..."]
 }
