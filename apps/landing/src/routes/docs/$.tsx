@@ -4,8 +4,8 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 
 import { useFumadocsLoader } from "fumadocs-core/source/client";
-import { DocsLayout } from "fumadocs-ui/layouts/docs";
-import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
+import { DocsLayout } from "fumadocs-ui/layouts/spacious";
+import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/spacious/page";
 
 import { useMDXComponents } from "@/components/mdx";
 import { baseOptions } from "@/lib/layout.shared";
