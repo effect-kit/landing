@@ -2,5 +2,18 @@
   "title": "Redis",
   "description": "Type-safe Redis client",
   "root": true,
-  "pages": ["index", "..."]
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "installation",
+    "quick-start",
+    "---Guides---",
+    "connections",
+    "commands",
+    "pub-sub",
+    "transactions",
+    "---Reference---",
+    "configuration",
+    "errors"
+  ]
 }
