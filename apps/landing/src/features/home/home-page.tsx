@@ -132,9 +132,9 @@ const kit = [
     Logo: RedisLogo,
     pitch: "Redis for Effect v4. A native client with typed commands and scoped connections.",
     facts: [
-      "Typed commands, exact integers",
-      "Node.js · Bun · Upstash HTTP",
-      "Effect is the only dependency",
+      "Typed commands and Schema-backed keys",
+      "Pipelines, transactions, Pub/Sub",
+      "Cluster and Sentinel routing",
     ],
   },
   {
@@ -145,8 +145,8 @@ const kit = [
     pitch: "One Email API across 16 providers, with React templates and bounded batches.",
     facts: [
       "Capability checks before sending",
-      "Typed errors with acceptance",
-      "Offline test Layer",
+      "Errors that say whether it was sent",
+      "Batches of up to 1,000 messages",
     ],
   },
   {
@@ -156,9 +156,9 @@ const kit = [
     Logo: StorageLogo,
     pitch: "Object storage for Effect. Put, scoped get, head, delete and paginated listing.",
     facts: [
-      "Read bodies tied to their scope",
-      "Memory storage for tests",
-      "Effect is the only dependency",
+      "Conditional writes, like create-only",
+      "Single-use reads tied to their scope",
+      "Lazy, paginated listing",
     ],
   },
 ] as const;

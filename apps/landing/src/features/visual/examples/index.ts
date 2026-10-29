@@ -33,7 +33,7 @@ export const visualExamples = {
 
 /** The examples behind each category tab, in tab order. */
 export const playgroundCategories = {
-  redis: { label: "Redis", examples: [redisRetry, redisPipeline, redisWatch, redisScope] },
+  redis: { label: "Redis", examples: [redisPipeline, redisRetry, redisWatch, redisScope] },
   emails: {
     label: "Emails",
     examples: [emailsBatch, emailsCapability, emailsAcceptance, emailsReact],
