@@ -1,0 +1,178 @@
+/* Redis hero: engine rail. */
+.ek-rail-bus {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  fill: none;
+}
+.ek-rail-tap {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  stroke-width: 1;
+  transition: stroke 0.4s ease;
+}
+.ek-rail-packet {
+  fill: var(--ek-accent);
+  filter: drop-shadow(0 0 6px var(--ek-accent));
+}
+.ek-rail-top,
+.ek-rail-side,
+.ek-rail-side-dark {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 34%, transparent);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transition:
+    fill 0.45s ease,
+    stroke 0.45s ease;
+}
+.ek-rail-top {
+  fill: var(--color-fd-background);
+}
+.ek-rail-side {
+  fill: color-mix(in oklab, var(--color-fd-background) 84%, var(--color-fd-foreground));
+}
+.ek-rail-side-dark {
+  fill: color-mix(in oklab, var(--color-fd-background) 92%, var(--color-fd-foreground));
+}
+.ek-rail-vent {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  stroke-width: 1;
+}
+.ek-rail-led {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 25%, transparent);
+  transition: fill 0.3s ease;
+}
+.ek-rail-mark {
+  color: color-mix(in oklab, var(--color-fd-foreground) 50%, transparent);
+  transition: color 0.45s ease;
+}
+.ek-rail-label {
+  fill: var(--color-fd-muted-foreground);
+  transition: fill 0.45s ease;
+}
+.ek-rail-server.is-lit .ek-rail-face {
+  fill: color-mix(in oklab, var(--ek-accent) 14%, var(--color-fd-background));
+}
+.ek-rail-server.is-lit .ek-rail-top,
+.ek-rail-server.is-lit .ek-rail-side,
+.ek-rail-server.is-lit .ek-rail-side-dark {
+  stroke: color-mix(in oklab, var(--ek-accent) 70%, transparent);
+}
+.ek-rail-server.is-lit .ek-rail-mark {
+  color: var(--ek-accent);
+}
+.ek-rail-server.is-lit .ek-rail-led {
+  fill: var(--ek-accent);
+}
+.ek-rail-server.is-lit .ek-rail-tap {
+  stroke: var(--ek-accent);
+}
+.ek-rail-server.is-lit .ek-rail-label {
+  fill: var(--color-fd-foreground);
+}
+
+/* Redis runtimes: the wire between program and server. */
+.ek-wire-node rect {
+  fill: var(--color-fd-background);
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 35%, transparent);
+}
+.ek-wire-node text {
+  fill: var(--color-fd-foreground);
+}
+.ek-wire-layer rect {
+  fill: color-mix(in oklab, var(--ek-accent) 18%, var(--color-fd-background));
+  stroke: var(--ek-accent);
+}
+.ek-wire-sub {
+  fill: var(--color-fd-muted-foreground);
+}
+.ek-wire-accent {
+  fill: var(--ek-accent);
+}
+.ek-wire-line {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 30%, transparent);
+  stroke-width: 1;
+  fill: none;
+}
+.ek-wire-packet {
+  fill: var(--ek-accent);
+}
+.ek-wire-packet.is-back {
+  fill: var(--color-fd-foreground);
+}
+
+/* Redis cluster ring. */
+.ek-ring-track {
+  fill: none;
+  stroke: var(--ek-line);
+  stroke-width: 1;
+}
+.ek-ring-tick {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  stroke-width: 1;
+}
+.ek-ring-arc {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 30%, transparent);
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke 0.4s ease;
+}
+.ek-ring-node.is-lit .ek-ring-arc {
+  stroke: color-mix(in oklab, var(--ek-accent) 65%, transparent);
+}
+.ek-ring-node-label {
+  fill: var(--color-fd-foreground);
+}
+.ek-ring-range {
+  fill: var(--color-fd-muted-foreground);
+}
+.ek-ring-core {
+  fill: var(--color-fd-background);
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 35%, transparent);
+}
+.ek-ring-core-label {
+  fill: var(--color-fd-muted-foreground);
+}
+.ek-ring-marker {
+  transition: transform 0.9s var(--ease-pop);
+}
+.ek-ring-ray {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.ek-ring-dot {
+  fill: var(--color-fd-background);
+  stroke: currentColor;
+  stroke-width: 2.5;
+}
+.ek-ring-marker[data-tone="a"],
+.ek-ring-label[data-tone="a"] {
+  color: var(--ek-accent);
+  fill: var(--ek-accent);
+}
+.ek-ring-marker[data-tone="b"] {
+  color: var(--color-fd-foreground);
+}
+.ek-ring-label[data-tone="b"] {
+  fill: var(--color-fd-foreground);
+}
+.ek-ring-marker .ek-ring-dot {
+  fill: var(--color-fd-background);
+}
+
+/* Redis closing cable. */
+.ek-cta-cable {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 35%, transparent);
+  stroke-width: 1.5;
+}
+.ek-cta-packet {
+  fill: var(--ek-accent);
+}
+.ek-cta-packet.is-back {
+  fill: var(--color-fd-foreground);
+}
+.ek-cta-logo.is-on {
+  color: var(--ek-accent);
+}

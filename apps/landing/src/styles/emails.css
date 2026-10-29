@@ -1,0 +1,64 @@
+/* Emails hero: pigeonhole wall. */
+.ek-hole-frame {
+  fill: color-mix(in oklab, var(--color-fd-background) 92%, var(--color-fd-foreground));
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+}
+.ek-hole-back {
+  fill: color-mix(in oklab, var(--color-fd-background) 97%, var(--color-fd-foreground));
+  transition: fill 0.5s ease;
+}
+.ek-hole-shade {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 7%, transparent);
+}
+.ek-hole-edge {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  transition: stroke 0.5s ease;
+}
+.ek-hole-mark {
+  color: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+  transition: color 0.5s ease;
+}
+.ek-hole-letter {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+}
+.ek-hole-name {
+  fill: var(--color-fd-muted-foreground);
+}
+.ek-hole.is-lit .ek-hole-back {
+  fill: color-mix(in oklab, var(--ek-accent) 14%, var(--color-fd-background));
+}
+.ek-hole.is-lit .ek-hole-edge {
+  stroke: var(--ek-accent);
+}
+.ek-hole.is-lit .ek-hole-mark {
+  color: var(--ek-accent);
+}
+.ek-hole.is-lit .ek-hole-letter,
+.ek-hole.is-lit .ek-hole-name {
+  fill: var(--ek-accent);
+}
+.ek-hole-envelope rect {
+  fill: var(--ek-accent);
+}
+.ek-hole-envelope path {
+  stroke: var(--ek-accent-ink);
+  stroke-width: 2;
+}
+
+/* Emails closing. */
+.ek-mail-flyer rect {
+  fill: var(--ek-accent);
+}
+.ek-mail-flyer path {
+  stroke: var(--ek-accent-ink);
+  stroke-width: 1.2;
+}
+.ek-mail-flap {
+  fill: none;
+  stroke: color-mix(in oklab, var(--ek-accent) 70%, transparent);
+  stroke-width: 1;
+}
+.ek-mail-wall {
+  fill-opacity: 0.92;
+}

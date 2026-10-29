@@ -1,0 +1,76 @@
+import { useEffect, useState } from "react";
+
+import { Link } from "@tanstack/react-router";
+
+import { GitHubIcon } from "@/components/icons/github-icon";
+import { EffectKitLogo } from "@/components/logos";
+import { cn } from "@/lib/cn";
+import { documentedPackages } from "@/lib/packages";
+
+import { Container } from "./section";
+
+const link =
+  "rounded-md px-1.5 py-2 text-fd-muted-foreground transition-colors hover:text-fd-foreground focus-visible:outline-2 focus-visible:outline-fd-ring sm:px-3";
+
+export function MarketingNav() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+
+    // Sync once on mount so a reload mid-page starts with the solid header.
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b transition-colors duration-300",
+        scrolled ? "border-(--ek-line) bg-fd-background/95" : "border-transparent bg-transparent",
+      )}
+    >
+      <Container className="flex h-15 items-center justify-between gap-3">
+        <Link
+          to="/"
+          title="Effect Kit home"
+          className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
+          aria-label="Effect Kit home"
+        >
+          <EffectKitLogo className="size-6" />
+          <span className="font-semibold whitespace-nowrap">Effect Kit</span>
+        </Link>
+        <nav aria-label="Main" className="flex items-center gap-1 text-sm">
+          {documentedPackages.map((pkg) =>
+            pkg.page ? (
+              <Link
+                key={pkg.slug}
+                to={pkg.page}
+                title={`${pkg.name} for Effect`}
+                className={cn(link, "data-[status=active]:text-fd-foreground")}
+              >
+                {pkg.name}
+              </Link>
+            ) : null,
+          )}
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-(--ek-line-strong) sm:mx-2" />
+          <Link to="/docs" title="Documentation" className={link}>
+            Docs
+          </Link>
+          <a
+            href="https://github.com/effect-kit"
+            title="Effect Kit on GitHub"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Effect Kit on GitHub"
+            className="grid size-10 place-items-center rounded-md text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground focus-visible:outline-2 focus-visible:outline-fd-ring"
+          >
+            <GitHubIcon className="size-4.5" />
+          </a>
+        </nav>
+      </Container>
+    </header>
+  );
+}

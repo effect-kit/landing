@@ -1,0 +1,197 @@
+/* -------------------------------------------------------------------------- */
+/* Home layer stack (after Griffin's platform story).                          */
+/* -------------------------------------------------------------------------- */
+
+.ek-step-0 {
+  --step: oklch(52% 0.17 235);
+}
+.ek-step-1 {
+  --step: oklch(55% 0.14 70);
+}
+.ek-step-2 {
+  --step: oklch(55% 0.2 15);
+}
+.ek-step-3 {
+  --step: oklch(52% 0.18 295);
+}
+.dark .ek-step-0 {
+  --step: oklch(78% 0.13 225);
+}
+.dark .ek-step-1 {
+  --step: oklch(84% 0.15 85);
+}
+.dark .ek-step-2 {
+  --step: oklch(74% 0.17 15);
+}
+.dark .ek-step-3 {
+  --step: oklch(76% 0.14 295);
+}
+
+.ek-dotted {
+  background-image: radial-gradient(circle, var(--ek-line-strong) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+}
+
+.ek-plate {
+  --plate-ink: color-mix(in oklab, var(--color-fd-foreground) 30%, transparent);
+  --plate-detail: color-mix(in oklab, var(--color-fd-foreground) 26%, transparent);
+}
+.ek-plate[data-state="active"] {
+  --plate-ink: color-mix(in oklab, var(--color-fd-foreground) 72%, transparent);
+  --plate-detail: color-mix(in oklab, var(--color-fd-foreground) 62%, transparent);
+}
+.ek-plate[data-state="idle"] {
+  --plate-ink: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  --plate-detail: color-mix(in oklab, var(--color-fd-foreground) 17%, transparent);
+}
+.ek-plate-top {
+  fill: var(--color-fd-background);
+  stroke: var(--plate-ink);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ek-plate-side {
+  fill: color-mix(in oklab, var(--color-fd-background) 80%, var(--color-fd-foreground));
+}
+.ek-plate-edge {
+  stroke: var(--plate-ink);
+  stroke-width: 1;
+}
+.ek-plate .ek-line {
+  stroke: var(--plate-detail);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ek-plate .ek-fill {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 7%, var(--color-fd-background));
+  stroke: var(--plate-detail);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ek-plate .ek-fill-strong {
+  fill: var(--plate-detail);
+}
+.ek-plate .ek-mark,
+.ek-plate .ek-engrave {
+  fill: var(--plate-detail);
+  color: var(--plate-detail);
+}
+.ek-plate[data-state="active"] .ek-mark {
+  color: var(--step);
+  fill: var(--step);
+}
+
+.ek-note-line {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 45%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ek-dash 0.7s var(--ease-out-expo) 0.15s forwards;
+}
+.ek-note-dot {
+  fill: var(--step);
+  animation: ek-rise 0.4s var(--ease-out-expo) both;
+}
+.ek-note-text {
+  fill: var(--color-fd-foreground);
+  animation: ek-rise 0.5s var(--ease-out-expo) 0.45s both;
+}
+
+/* Hero floor: the three package colours for the tiles that rise in colour. */
+.ek-iso-field {
+  --ek-kit: oklch(55% 0.2 258);
+  --ek-redis: oklch(54% 0.21 27);
+  --ek-emails: oklch(58% 0.14 70);
+}
+.dark .ek-iso-field {
+  --ek-kit: oklch(70% 0.16 252);
+  --ek-redis: oklch(67% 0.2 26);
+  --ek-emails: oklch(81% 0.15 80);
+}
+
+/* The stack's side rail fills with the step colour as you scroll, with a bright head. */
+.ek-rail-fill {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in oklab, var(--step) 45%, transparent) 70%,
+    var(--step)
+  );
+  box-shadow: 0 0 10px 0 color-mix(in oklab, var(--step) 60%, transparent);
+  transition: background 0.4s ease;
+}
+
+/* Home closing: isometric "your app" plate with package blocks dropping into their slots. */
+.ek-cta-top {
+  fill: var(--color-fd-background);
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 40%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-side {
+  fill: color-mix(in oklab, var(--color-fd-background) 82%, var(--color-fd-foreground));
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 40%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-side-dark {
+  fill: color-mix(in oklab, var(--color-fd-background) 90%, var(--color-fd-foreground));
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 40%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-line {
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 22%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.ek-cta-engrave {
+  fill: color-mix(in oklab, var(--color-fd-foreground) 40%, transparent);
+}
+.ek-cta-slot {
+  fill: transparent;
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 28%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition:
+    fill 0.5s ease,
+    stroke 0.5s ease;
+}
+.ek-cta-slot.is-docked {
+  fill: color-mix(in oklab, var(--ek-accent) 14%, transparent);
+  stroke: var(--ek-accent);
+}
+.ek-cta-module {
+  transition: transform 0.9s var(--ease-pop);
+}
+.ek-cta-module-top {
+  fill: var(--color-fd-card);
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+  stroke-width: 1;
+  transition: fill 0.5s ease;
+}
+.ek-cta-module-side {
+  fill: color-mix(in oklab, var(--color-fd-background) 74%, var(--color-fd-foreground));
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-module-side-dark {
+  fill: color-mix(in oklab, var(--color-fd-background) 84%, var(--color-fd-foreground));
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-module.is-docked .ek-cta-module-top {
+  fill: color-mix(in oklab, var(--ek-accent) 16%, var(--color-fd-card));
+}
+.ek-cta-logo {
+  color: color-mix(in oklab, var(--color-fd-foreground) 55%, transparent);
+  transition: color 0.5s ease;
+}
+.ek-cta-module.is-docked .ek-cta-logo {
+  color: var(--ek-accent);
+}
+.ek-cta-ghost {
+  fill: none;
+  stroke: color-mix(in oklab, var(--color-fd-foreground) 30%, transparent);
+  stroke-width: 1;
+}
+.ek-cta-module.is-soon .ek-cta-logo {
+  color: color-mix(in oklab, var(--color-fd-foreground) 28%, transparent);
+}

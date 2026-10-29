@@ -13,11 +13,27 @@ export interface PackageInfo {
   readonly Logo: ComponentType<LogoProps>;
   /** Whether `content/docs/<slug>` exists yet. */
   readonly hasDocs: boolean;
+  /** Marketing page, once the package has one. */
+  readonly page?: "/redis" | "/emails";
 }
 
 export const packages: readonly PackageInfo[] = [
-  { slug: "redis", name: "Redis", repo: "effect-kit/redis", Logo: RedisLogo, hasDocs: true },
-  { slug: "emails", name: "Emails", repo: "effect-kit/emails", Logo: EmailsLogo, hasDocs: true },
+  {
+    slug: "redis",
+    name: "Redis",
+    repo: "effect-kit/redis",
+    Logo: RedisLogo,
+    hasDocs: true,
+    page: "/redis",
+  },
+  {
+    slug: "emails",
+    name: "Emails",
+    repo: "effect-kit/emails",
+    Logo: EmailsLogo,
+    hasDocs: true,
+    page: "/emails",
+  },
   {
     slug: "storage",
     name: "Storage",
@@ -36,6 +52,7 @@ export function getPackage(slug: string | undefined): PackageInfo | undefined {
 /** Resolve the package from a docs URL such as `/docs/redis/commands`. */
 export function getPackageFromUrl(url: string): PackageInfo | undefined {
   if (!url.startsWith(`${docsRoute}/`)) return undefined;
+
   return getPackage(url.slice(docsRoute.length + 1).split("/")[0]);
 }
 
