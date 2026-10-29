@@ -5,6 +5,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fumadocsMdx } from "fumadocs-mdx/vite";
+import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
 
 // Package docs are only linked from the picker popover, so seed the crawler with each one.
@@ -26,6 +27,8 @@ export default defineConfig({
       },
       pages: [...packageDocs, { path: "/sitemap.xml" }, { path: "/robots.txt" }],
     }),
+    // Nitro builds the server for the host it detects (Vercel when deployed there).
+    nitro(),
     react(),
   ],
   resolve: {

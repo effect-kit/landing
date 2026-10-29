@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-
+// Inlined into the server bundle so the fonts ship with the serverless function; a runtime
+// file read would point at node_modules, which deployments don't include.
+import inter from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?inline";
+import mono from "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?inline";
 import { Renderer } from "takumi-js/node";
 
-const require = createRequire(import.meta.url);
+const bytes = (dataUrl: string) => Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
 
 let renderer: Promise<Renderer> | undefined;
 
@@ -11,15 +12,12 @@ let renderer: Promise<Renderer> | undefined;
 export function getRenderer() {
   renderer ??= (async () => {
     const instance = new Renderer();
-    const [inter, mono] = await Promise.all([
-      readFile(require.resolve("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")),
-      readFile(
-        require.resolve("@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2"),
-      ),
-    ]);
-    await instance.registerFont({ name: "Inter", data: inter });
-    await instance.registerFont({ name: "JetBrains Mono", data: mono });
+
+    await instance.registerFont({ name: "Inter", data: bytes(inter) });
+    await instance.registerFont({ name: "JetBrains Mono", data: bytes(mono) });
+
     return instance;
   })();
+
   return renderer;
 }
