@@ -5,6 +5,7 @@ import { isMarkdownPreferred } from "fumadocs-core/negotiation";
 import { landingMarkdown, landingPaths } from "@/content/landing-markdown";
 
 import { markdownHeaders } from "./agent-headers";
+import { countAgentRead } from "./analytics/agent";
 import { getChangelogPackage } from "./packages";
 import { docsLlms, source } from "./source";
 
@@ -20,7 +21,10 @@ export const markdownNegotiation = createMiddleware({ type: "request" }).server(
 
     const landing = landingPaths[pathname];
 
-    if (landing) return new Response(landingMarkdown(landing), { headers: markdownHeaders });
+    if (landing) {
+      await countAgentRead(request, "negotiated");
+      return new Response(landingMarkdown(landing), { headers: markdownHeaders });
+    }
 
     const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
 
@@ -30,6 +34,7 @@ export const markdownNegotiation = createMiddleware({ type: "request" }).server(
     const changelog = getChangelogPackage(slugs);
 
     if (changelog) {
+      await countAgentRead(request, "negotiated");
       const { changelogMarkdown } = await import("./changelog.server");
       return new Response(await changelogMarkdown(changelog), { headers: markdownHeaders });
     }
@@ -37,6 +42,8 @@ export const markdownNegotiation = createMiddleware({ type: "request" }).server(
     const page = source.getPage(slugs.length > 0 ? slugs : ["redis"]);
 
     if (!page) return next();
+
+    await countAgentRead(request, "negotiated");
 
     return new Response(await docsLlms.page(page), { headers: markdownHeaders });
   },

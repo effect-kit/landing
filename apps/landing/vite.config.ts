@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 
+import posthog from "@posthog/rollup-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fumadocsMdx } from "fumadocs-mdx/vite";
@@ -29,7 +30,32 @@ const packageDocs = readdirSync("content/docs", { withFileTypes: true }).flatMap
   entry.isDirectory() ? [{ path: `/docs/${entry.name}` }, { path: `/docs/${entry.name}.md` }] : [],
 );
 
+// The deploy's git SHA ties analytics events and error stack traces to a release.
+const release = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
+
+// Source maps go to PostHog error tracking only from builds that hold a personal API key; they
+// are deleted after upload, so the site never serves them.
+const personalApiKey = process.env.POSTHOG_PERSONAL_API_KEY;
+const sourceMaps = personalApiKey
+  ? [
+      posthog({
+        personalApiKey,
+        projectId: process.env.POSTHOG_PROJECT_ID ?? "695548",
+        host: "https://us.posthog.com",
+        sourcemaps: {
+          enabled: true,
+          releaseName: "effectkit-landing",
+          releaseVersion: release,
+          deleteAfterUpload: true,
+        },
+      }),
+    ]
+  : [];
+
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_RELEASE": JSON.stringify(release),
+  },
   server: {
     port: 3000,
   },
@@ -65,6 +91,7 @@ export default defineConfig({
       traceDeps: ["takumi-js"],
     }),
     react(),
+    ...sourceMaps,
   ],
   resolve: {
     tsconfigPaths: true,

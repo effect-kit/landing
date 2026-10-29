@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { textHeaders } from "@/lib/agent-headers";
+import { countAgentRead } from "@/lib/analytics/agent";
 import { getPageMarkdownUrl } from "@/lib/shared";
 import { absolute, site } from "@/lib/site";
 import { source } from "@/lib/source";
@@ -28,7 +29,7 @@ function docsIndex() {
 export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {
-      GET: () => {
+      GET: async ({ request }) => {
         const body = [
           `# ${site.name}`,
           `> ${site.description}`,
@@ -41,6 +42,8 @@ export const Route = createFileRoute("/llms.txt")({
           ].join("\n"),
           docsIndex(),
         ].join("\n\n");
+
+        await countAgentRead(request, "llms");
 
         return new Response(body, { headers: textHeaders });
       },

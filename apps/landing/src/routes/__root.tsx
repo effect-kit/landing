@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import {
   createRootRoute,
@@ -11,6 +11,7 @@ import {
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 
 import SearchDialog from "@/components/search";
+import { startAnalytics } from "@/lib/analytics/client";
 import { getPackageFromUrl } from "@/lib/packages";
 import { pageTitle } from "@/lib/seo";
 import { docsRoute } from "@/lib/shared";
@@ -58,6 +59,8 @@ function RootDocument({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const isDocs = pathname === docsRoute || pathname.startsWith(`${docsRoute}/`);
   const accent = isDocs ? getPackageFromUrl(pathname)?.slug : undefined;
+
+  useEffect(startAnalytics, []);
 
   return (
     <html
