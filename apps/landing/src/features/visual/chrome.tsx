@@ -11,6 +11,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Volume2Icon, VolumeXIcon } from "lucide-react";
 import { motion } from "motion/react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { setSoundEnabled, sounds, useSoundEnabled } from "./sounds";
@@ -30,6 +31,7 @@ export function SoundToggle({ className }: { readonly className?: string }) {
       aria-label="Sound"
       title={enabled ? "Sound on" : "Sound off"}
       onClick={() => {
+        track("sound_toggled", { enabled: !enabled });
         setSoundEnabled(!enabled);
         if (!enabled) void sounds.configChange();
       }}
@@ -141,6 +143,13 @@ export function VisualCredit({ className }: { readonly className?: string }) {
       <a
         href="https://github.com/kitlangton/visual-effect"
         title="Visual Effect by Kit Langton on GitHub"
+        onClick={() =>
+          track("outbound_link_clicked", {
+            destination: "https://github.com/kitlangton/visual-effect",
+            host: "github.com",
+            location: "section",
+          })
+        }
         target="_blank"
         rel="noreferrer"
         className={cn(

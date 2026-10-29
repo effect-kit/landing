@@ -4,7 +4,9 @@ import { BrandIcon } from "@/components/brands/brand-icon";
 import type { BrandKey } from "@/components/brands/data";
 import { EffectKitLogo } from "@/components/logos";
 import { ButtonLink } from "@/components/marketing/button";
+import { useSectionView } from "@/components/marketing/hooks";
 import { Container, Heading, Lede } from "@/components/marketing/section";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 /**
@@ -376,7 +378,13 @@ function StepItem({
           </p>
           {index === steps.length - 1 ? (
             <div className="pt-3">
-              <ButtonLink to="/docs" variant="ghost" label="Read the docs" />
+              <ButtonLink
+                to="/docs"
+                variant="ghost"
+                label="Read the docs"
+                location="section"
+                cta="layer_stack_docs"
+              />
             </div>
           ) : null}
         </div>
@@ -401,6 +409,17 @@ export function LayerStack() {
   const section = useRef<HTMLElement>(null);
   const [state, setState] = useState(0);
   const active = Math.round(state);
+  const reached = useRef(new Set<string>());
+  useSectionView(section, "layer_stack");
+
+  // Each step counts once per page view, however often the reader scrolls back over it.
+  useEffect(() => {
+    const step = steps[active - 1];
+    if (!step || reached.current.has(step.id)) return;
+
+    reached.current.add(step.id);
+    track("layer_stack_step_reached", { step_id: step.id, index: active - 1 });
+  }, [active]);
 
   useEffect(() => {
     let frame = 0;
@@ -452,6 +471,8 @@ export function LayerStack() {
   return (
     <section
       ref={section}
+      id="layer_stack"
+      data-section=""
       aria-label="How Effect Kit fits into an Effect app"
       className={cn("relative border-t border-(--ek-line)", `ek-step-${Math.max(active - 1, 0)}`)}
       style={{ height: `${STATES * 90}svh` }}

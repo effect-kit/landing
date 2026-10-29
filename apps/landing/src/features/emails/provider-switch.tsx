@@ -13,6 +13,7 @@ import {
   getEmailProvider,
 } from "@/content/email-providers";
 import { type SnippetId, snippets } from "@/content/snippets";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -86,7 +87,11 @@ export function ProviderSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
-      <CodeWindow code={snippets[`emails.swap.${provider.id}`].code} className="min-w-0 self-start">
+      <CodeWindow
+        code={snippets[`emails.swap.${provider.id}`].code}
+        snippetId={`emails.swap.${provider.id}`}
+        className="min-w-0 self-start"
+      >
         <MagicCode tokens={tokens} ids={swapSnippetIds} current={`emails.swap.${provider.id}`} />
       </CodeWindow>
 
@@ -133,7 +138,13 @@ export function ProviderSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
                     <button
                       type="button"
                       aria-pressed={selected}
-                      onClick={() => setProviderId(entry.id)}
+                      onClick={() => {
+                        if (entry.id !== providerId) {
+                          track("provider_selected", { provider: entry.id, previous: providerId });
+                        }
+
+                        setProviderId(entry.id);
+                      }}
                       className={cn(
                         "flex w-full cursor-pointer items-center gap-2.5 px-4 py-2 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring",
                         selected

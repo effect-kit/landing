@@ -6,6 +6,7 @@ import { CodeWindow } from "@/components/marketing/code";
 import { useReducedMotion } from "@/components/marketing/hooks";
 import { MagicCode } from "@/components/marketing/magic-code";
 import { type SnippetId, snippets } from "@/content/snippets";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -211,7 +212,13 @@ export function RuntimeSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
               key={entry.id}
               type="button"
               aria-pressed={selected}
-              onClick={() => setRuntimeId(entry.id)}
+              onClick={() => {
+                if (entry.id !== runtimeId) {
+                  track("runtime_selected", { runtime: entry.id, previous: runtimeId });
+                }
+
+                setRuntimeId(entry.id);
+              }}
               className={cn(
                 "flex cursor-pointer items-center gap-4 p-5 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fd-ring",
                 selected ? "bg-fd-card" : "bg-fd-background hover:bg-fd-card/60",
@@ -281,6 +288,7 @@ export function RuntimeSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
         </div>
         <CodeWindow
           code={snippets[`redis.runtime.${runtime.id}`].code}
+          snippetId={`redis.runtime.${runtime.id}`}
           className="min-w-0 self-start"
         >
           <MagicCode

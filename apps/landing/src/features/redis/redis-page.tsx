@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { RedisLogo } from "@/components/logos";
 import { ButtonLink, ExternalButton } from "@/components/marketing/button";
+import { useSectionView } from "@/components/marketing/hooks";
 import {
   Container,
   Heading,
@@ -35,7 +36,7 @@ export function RedisPage({
   return (
     <div data-accent="redis">
       <Hero />
-      <Section>
+      <Section id="write_figure">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             eyebrow="When a connection drops"
@@ -48,7 +49,7 @@ export function RedisPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="playground">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader index="01" eyebrow="Playground" title="Run it in your browser." />
           <div className="mt-12" data-reveal>
@@ -56,7 +57,7 @@ export function RedisPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="api_tour">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader index="02" eyebrow="The API" title="Values keep their shape." />
           <div className="mt-12" data-reveal>
@@ -64,7 +65,7 @@ export function RedisPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="runtime_switch">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="03"
@@ -78,7 +79,7 @@ export function RedisPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="cluster">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="04"
@@ -99,8 +100,11 @@ export function RedisPage({
 }
 
 function Hero() {
+  const root = useRef<HTMLElement>(null);
+  useSectionView(root, "hero");
+
   return (
-    <section className="relative -mt-15 overflow-hidden">
+    <section ref={root} data-section="" className="relative -mt-15 overflow-hidden">
       <div
         aria-hidden="true"
         className="ek-dotted pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_70%,black,transparent_80%)]"
@@ -126,11 +130,15 @@ function Hero() {
               to="/docs/$"
               params={{ _splat: "redis" }}
               label="Read the docs"
+              location="hero"
+              cta="redis_docs"
               className="h-11 px-5"
             />
             <ExternalButton
               href="https://github.com/effect-kit/redis"
               label="GitHub"
+              location="hero"
+              cta="redis_github"
               icon={<GitHubIcon className="size-4" />}
               className="h-11 px-5"
             />
@@ -157,7 +165,7 @@ const groups = [
 
 function Integrations() {
   return (
-    <Section>
+    <Section id="integrations">
       <Container className="max-w-[1400px] py-24 md:py-32">
         <SectionHeader index="05" eyebrow="Supported" title="Supported integrations." />
         <div className="mt-12 flex flex-col gap-10">

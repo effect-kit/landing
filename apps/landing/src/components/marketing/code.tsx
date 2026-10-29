@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, use, useEffect, useRef } from "react";
 
 import { snippets, type SnippetId } from "@/content/snippets";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 import type { HighlightedSnippets } from "@/lib/highlight";
 
@@ -88,11 +89,14 @@ export function Code({ id, active = NO_LINES, flashFrom, className }: CodeProps)
 /** Frame around code, with a copy button in the top-right corner. */
 export function CodeWindow({
   code,
+  snippetId,
   children,
   className,
 }: {
   /** The source the copy button copies. */
   readonly code: string;
+  /** Which snippet this is, for the copy event. */
+  readonly snippetId?: string;
   readonly children: ReactNode;
   readonly className?: string;
 }) {
@@ -105,6 +109,13 @@ export function CodeWindow({
     >
       <CopyButton
         text={code}
+        onCopied={() =>
+          track("code_copied", {
+            snippet_id: snippetId ?? "unknown",
+            surface: "code_window",
+            lines: code.split("\n").length,
+          })
+        }
         className="absolute top-2 right-2 z-10 bg-fd-card/80 backdrop-blur-sm"
       />
       {children}

@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { EffectKitLogo } from "@/components/logos";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 import { documentedPackages } from "@/lib/packages";
 
@@ -36,6 +37,7 @@ export function MarketingNav() {
         <Link
           to="/"
           title="Effect Kit home"
+          onClick={() => track("nav_link_clicked", { location: "header", target: "home" })}
           className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
           aria-label="Effect Kit home"
         >
@@ -49,6 +51,7 @@ export function MarketingNav() {
                 key={pkg.slug}
                 to={pkg.page}
                 title={`${pkg.name} for Effect`}
+                onClick={() => track("nav_link_clicked", { location: "header", target: pkg.slug })}
                 className={cn(link, "data-[status=active]:text-fd-foreground")}
               >
                 {pkg.name}
@@ -56,7 +59,12 @@ export function MarketingNav() {
             ) : null,
           )}
           <span aria-hidden="true" className="mx-1 h-4 w-px bg-(--ek-line-strong) sm:mx-2" />
-          <Link to="/docs" title="Documentation" className={link}>
+          <Link
+            to="/docs"
+            title="Documentation"
+            className={link}
+            onClick={() => track("nav_link_clicked", { location: "header", target: "docs" })}
+          >
             Docs
           </Link>
           <a
@@ -65,6 +73,13 @@ export function MarketingNav() {
             target="_blank"
             rel="noreferrer"
             aria-label="Effect Kit on GitHub"
+            onClick={() =>
+              track("outbound_link_clicked", {
+                destination: "https://github.com/effect-kit",
+                host: "github.com",
+                location: "header",
+              })
+            }
             className="grid size-10 place-items-center rounded-md text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground focus-visible:outline-2 focus-visible:outline-fd-ring"
           >
             <GitHubIcon className="size-4.5" />

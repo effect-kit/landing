@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { EmailsLogo } from "@/components/logos";
 import { ButtonLink, ExternalButton } from "@/components/marketing/button";
 import { Code, CodeWindow } from "@/components/marketing/code";
+import { useSectionView } from "@/components/marketing/hooks";
 import { Container, Heading, Lede, Section, SectionHeader } from "@/components/marketing/section";
 import { snippets } from "@/content/snippets";
 import { EmailsGaugeFigure } from "@/features/figures/emails-gauge/figure";
@@ -29,7 +30,7 @@ export function EmailsPage({
   return (
     <div data-accent="emails">
       <Hero />
-      <Section>
+      <Section id="capability_check">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             eyebrow="Before it leaves"
@@ -42,7 +43,7 @@ export function EmailsPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="providers">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="01"
@@ -56,7 +57,7 @@ export function EmailsPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="playground">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader index="02" eyebrow="Playground" title="Run it in your browser." />
           <div className="mt-12" data-reveal>
@@ -64,7 +65,7 @@ export function EmailsPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="idempotency">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="03"
@@ -78,7 +79,7 @@ export function EmailsPage({
           </div>
         </Container>
       </Section>
-      <Section>
+      <Section id="react_templates">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="04"
@@ -88,7 +89,7 @@ export function EmailsPage({
             wide
           />
           <div className="mt-12 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0" data-reveal>
-            <CodeWindow code={snippets["emails.react"].code}>
+            <CodeWindow code={snippets["emails.react"].code} snippetId="emails.react">
               <Code id="emails.react" />
             </CodeWindow>
             <TemplatePreview />
@@ -101,8 +102,11 @@ export function EmailsPage({
 }
 
 function Hero() {
+  const root = useRef<HTMLElement>(null);
+  useSectionView(root, "hero");
+
   return (
-    <section className="relative -mt-15 overflow-hidden">
+    <section ref={root} data-section="" className="relative -mt-15 overflow-hidden">
       <div
         aria-hidden="true"
         className="ek-dotted pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_60%_70%_at_70%_55%,black,transparent_80%)]"
@@ -128,11 +132,15 @@ function Hero() {
               to="/docs/$"
               params={{ _splat: "emails" }}
               label="Read the docs"
+              location="hero"
+              cta="emails_docs"
               className="h-11 px-5"
             />
             <ExternalButton
               href="https://github.com/effect-kit/emails"
               label="GitHub"
+              location="hero"
+              cta="emails_github"
               icon={<GitHubIcon className="size-4" />}
               className="h-11 px-5"
             />

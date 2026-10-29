@@ -1,7 +1,9 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, MouseEventHandler, ReactNode } from "react";
 
 import { Link, type LinkProps } from "@tanstack/react-router";
 
+import { track } from "@/lib/analytics/client";
+import type { Location } from "@/lib/analytics/events";
 import { cn } from "@/lib/cn";
 
 const variants = {
@@ -17,6 +19,29 @@ const base =
 interface ButtonContentProps {
   readonly label: string;
   readonly icon?: ReactNode;
+  /** Where on the page the button sits, for analytics. */
+  readonly location?: Location;
+  /** Stable name of the call to action, for analytics. */
+  readonly cta?: string;
+}
+
+function hrefOf({ to, params }: { readonly to?: unknown; readonly params?: unknown }) {
+  if (typeof to !== "string") return "";
+
+  const splat =
+    typeof params === "object" && params !== null && "_splat" in params
+      ? String(params._splat)
+      : "";
+
+  return to.replace("$", splat);
+}
+
+function hostOf(href: string) {
+  try {
+    return new URL(href, "https://effectkit.dev").hostname;
+  } catch {
+    return "";
+  }
 }
 
 function Content({ label, icon }: ButtonContentProps) {
@@ -33,11 +58,30 @@ export function ButtonLink({
   label,
   icon,
   className,
+  location = "section",
+  cta,
+  onClick,
   ...props
 }: LinkProps &
-  ButtonContentProps & { readonly variant?: keyof typeof variants; readonly className?: string }) {
+  ButtonContentProps & {
+    readonly variant?: keyof typeof variants;
+    readonly className?: string;
+    readonly onClick?: MouseEventHandler<HTMLAnchorElement>;
+  }) {
   return (
-    <Link className={cn(base, variants[variant], className)} title={label} {...props}>
+    <Link
+      className={cn(base, variants[variant], className)}
+      title={label}
+      onClick={(event) => {
+        onClick?.(event);
+        track("cta_clicked", {
+          cta: cta ?? label,
+          location,
+          href: hrefOf(props),
+        });
+      }}
+      {...props}
+    >
       <Content label={label} {...(icon ? { icon } : {})} />
     </Link>
   );
@@ -48,6 +92,10 @@ export function ExternalButton({
   label,
   icon,
   className,
+  location = "section",
+  cta,
+  href = "",
+  onClick,
   ...props
 }: ComponentProps<"a"> & ButtonContentProps & { readonly variant?: keyof typeof variants }) {
   return (
@@ -56,6 +104,13 @@ export function ExternalButton({
       className={cn(base, variants[variant], className)}
       target="_blank"
       rel="noreferrer"
+      href={href}
+      onClick={(event) => {
+        onClick?.(event);
+
+        track("outbound_link_clicked", { destination: href, host: hostOf(href), location });
+        if (cta) track("cta_clicked", { cta, location, href });
+      }}
       {...props}
     >
       <Content label={label} {...(icon ? { icon } : {})} />

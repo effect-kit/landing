@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 const textBody = (name: string) => `Welcome, ${name}
@@ -48,7 +49,11 @@ export function TemplatePreview() {
               key={entry}
               type="button"
               aria-pressed={mode === entry}
-              onClick={() => setMode(entry)}
+              onClick={() => {
+                if (entry !== mode) track("template_mode_changed", { mode: entry });
+
+                setMode(entry);
+              }}
               className={cn(
                 "cursor-pointer rounded px-2 py-1 font-mono text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-fd-ring",
                 mode === entry ? "bg-fd-accent text-fd-foreground" : "text-fd-muted-foreground",

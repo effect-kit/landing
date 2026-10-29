@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import { Link } from "@tanstack/react-router";
 
 import { EmailsLogo, type LogoProps, RedisLogo, StorageLogo } from "@/components/logos";
+import { useSectionView } from "@/components/marketing/hooks";
 import {
   Container,
   Heading,
@@ -11,6 +12,7 @@ import {
   Section,
   SectionHeader,
 } from "@/components/marketing/section";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { Closing } from "./closing";
@@ -27,7 +29,7 @@ export function HomePage({ playground }: { readonly playground: ReactNode }) {
       <Hero />
       <Packages />
       <LayerStack />
-      <Section>
+      <Section id="playground">
         <Container className="max-w-[1400px] py-24 md:py-32">
           <SectionHeader
             index="02"
@@ -51,8 +53,11 @@ export function HomePage({ playground }: { readonly playground: ReactNode }) {
  * visible grid), an isometric floor that breathes behind it, and the terrain band underneath.
  */
 function Hero() {
+  const root = useRef<HTMLElement>(null);
+  useSectionView(root, "hero");
+
   return (
-    <section className="relative -mt-15 overflow-hidden">
+    <section ref={root} data-section="" className="relative -mt-15 overflow-hidden">
       <IsoField className="absolute inset-0 size-full" />
       <div
         aria-hidden="true"
@@ -111,6 +116,9 @@ function PackageButton({
     <Link
       to={to}
       title={label}
+      onClick={() =>
+        track("cta_clicked", { cta: `${to.slice(1)}_page`, location: "hero", href: to })
+      }
       className={cn(
         "group inline-flex h-11 items-center gap-2.5 rounded-md px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring",
         primary
@@ -181,6 +189,9 @@ function KitCard({ pkg, index }: { readonly pkg: (typeof kit)[number]; readonly 
           <Link
             to={pkg.to}
             title={`${pkg.name} for Effect`}
+            onClick={() =>
+              track("cta_clicked", { cta: `${pkg.slug}_page`, location: "packages", href: pkg.to })
+            }
             className="rounded-sm after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fd-ring"
           >
             {pkg.name}
@@ -211,6 +222,13 @@ function KitCard({ pkg, index }: { readonly pkg: (typeof kit)[number]; readonly 
             to="/docs/$"
             title={`${pkg.name} documentation`}
             params={{ _splat: pkg.slug }}
+            onClick={() =>
+              track("cta_clicked", {
+                cta: `${pkg.slug}_docs`,
+                location: "packages",
+                href: `/docs/${pkg.slug}`,
+              })
+            }
             className="relative z-10 rounded-sm text-fd-foreground/80 underline decoration-(--ek-line-strong) underline-offset-4 transition-colors hover:text-fd-foreground hover:decoration-fd-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring"
           >
             {pkg.name} docs
@@ -225,7 +243,7 @@ function KitCard({ pkg, index }: { readonly pkg: (typeof kit)[number]; readonly 
 
 function Packages() {
   return (
-    <Section rule={false}>
+    <Section rule={false} id="packages">
       <Container className="max-w-[1400px] py-24">
         <SectionHeader
           index="01"
@@ -244,6 +262,13 @@ function Packages() {
             target="_blank"
             rel="noreferrer"
             aria-label="Your integration: open an issue on github.com/effect-kit"
+            onClick={() =>
+              track("outbound_link_clicked", {
+                destination: "https://github.com/effect-kit",
+                host: "github.com",
+                location: "packages",
+              })
+            }
             data-reveal
             style={revealStyle(3)}
             className={cn(

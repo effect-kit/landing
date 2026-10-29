@@ -4,6 +4,7 @@ import { CodeWindow } from "@/components/marketing/code";
 import { useInView, useReducedMotion } from "@/components/marketing/hooks";
 import { MagicCode } from "@/components/marketing/magic-code";
 import { type SnippetId, snippets } from "@/content/snippets";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -59,6 +60,18 @@ export function ApiTour({ tokens }: { readonly tokens: KeyedSnippets }) {
   const bar = useRef<HTMLSpanElement>(null);
   const inView = useInView(root, { threshold: 0.35 });
   const reduced = useReducedMotion();
+  const cause = useRef<"auto" | "click">("auto");
+  const reported = useRef(-1);
+
+  // A stop counts once it is on screen, whether the tour advanced or a click picked it.
+  useEffect(() => {
+    const entry = tour[active];
+    if (!inView || !entry || reported.current === active) return;
+
+    reported.current = active;
+    track("api_tour_step_viewed", { step_id: entry.id, index: active, cause: cause.current });
+    cause.current = "auto";
+  }, [active, inView]);
 
   useEffect(() => {
     bar.current?.style.setProperty("--progress", "0");
@@ -106,6 +119,7 @@ export function ApiTour({ tokens }: { readonly tokens: KeyedSnippets }) {
               aria-selected={selected}
               onClick={() => {
                 // Picking a tab restarts its timer; the tour carries on from there.
+                if (index !== active) cause.current = "click";
                 setActive(index);
               }}
               className={cn(
@@ -135,7 +149,11 @@ export function ApiTour({ tokens }: { readonly tokens: KeyedSnippets }) {
           );
         })}
       </div>
-      <CodeWindow code={snippets[current.id].code} className="min-w-0 self-start">
+      <CodeWindow
+        code={snippets[current.id].code}
+        snippetId={current.id}
+        className="min-w-0 self-start"
+      >
         <MagicCode tokens={tokens} ids={apiTourSnippetIds} current={current.id} />
         <p className="border-t border-(--ek-line) px-5 py-3 font-mono text-xs text-fd-muted-foreground">
           <span className="text-ek-accent">{"// "}</span>

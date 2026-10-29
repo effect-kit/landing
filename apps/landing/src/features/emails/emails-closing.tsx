@@ -1,7 +1,9 @@
+import { useRef } from "react";
+
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { EmailsLogo } from "@/components/logos";
 import { ButtonLink, ExternalButton } from "@/components/marketing/button";
-import { useReducedMotion } from "@/components/marketing/hooks";
+import { useReducedMotion, useSectionView } from "@/components/marketing/hooks";
 import { InstallCommand } from "@/components/marketing/install-command";
 import { isoProjector } from "@/components/marketing/iso";
 import { Container, Eyebrow, Heading } from "@/components/marketing/section";
@@ -121,8 +123,17 @@ function Illustration() {
 }
 
 export function EmailsClosing() {
+  const root = useRef<HTMLElement>(null);
+  useSectionView(root, "closing");
+
   return (
-    <section aria-labelledby="emails-closing-title" className="border-t border-(--ek-line)">
+    <section
+      ref={root}
+      id="closing"
+      data-section=""
+      aria-labelledby="emails-closing-title"
+      className="border-t border-(--ek-line)"
+    >
       <Container className="max-w-[1400px] py-20 md:py-28">
         <div className="relative grid grid-cols-1 border border-(--ek-line) lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] [&>*]:min-w-0">
           <div className="ek-corners pointer-events-none absolute -inset-px" aria-hidden="true" />
@@ -135,11 +146,15 @@ export function EmailsClosing() {
                 to="/docs/$"
                 params={{ _splat: "emails" }}
                 label="Read the docs"
+                location="closing"
+                cta="emails_docs"
                 icon={<EmailsLogo className="size-4" />}
               />
               <ExternalButton
                 href="https://github.com/effect-kit/emails"
                 label="GitHub"
+                location="closing"
+                cta="emails_github"
                 icon={<GitHubIcon className="size-4" />}
               />
             </div>

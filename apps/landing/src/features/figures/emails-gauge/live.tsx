@@ -5,6 +5,7 @@ import * as React from "react";
 import { translateAlong, type SolidPaths } from "@/components/iso/iso-kit";
 import { IsoFigure } from "@/components/iso/react/draw";
 import { asksForStillness, useReadout } from "@/components/iso/react/live";
+import { track } from "@/lib/analytics/client";
 
 import { begin, settledSim, step, type Sim } from "./bench";
 import { flagOf, letterOf, marksOf, pointerOf } from "./frame";
@@ -310,9 +311,23 @@ export function EmailsGaugeLive(props: Props) {
     begin(sim.current, next);
     run();
   };
-  const turn = (by: number) =>
-    choose({ ...setup, station: (setup.station + by + STATIONS.length) % STATIONS.length });
-  const toggle = () => choose({ ...setup, attached: !setup.attached });
+  const turn = (by: number) => {
+    const station = (setup.station + by + STATIONS.length) % STATIONS.length;
+    track("figure_interacted", {
+      figure: "emails_gauge",
+      action: "dial_turned",
+      value: stationAt(station).name,
+    });
+    choose({ ...setup, station });
+  };
+  const toggle = () => {
+    track("figure_interacted", {
+      figure: "emails_gauge",
+      action: "attachment_toggled",
+      value: !setup.attached,
+    });
+    choose({ ...setup, attached: !setup.attached });
+  };
 
   const station = stationAt(setup.station);
 

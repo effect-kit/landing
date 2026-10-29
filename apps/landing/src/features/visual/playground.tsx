@@ -1,5 +1,7 @@
-import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { useInView } from "@/components/marketing/hooks";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { SoundToggle, VisualCredit } from "./chrome";
@@ -99,6 +101,13 @@ function ExampleTabName({ example }: { readonly example: VisualExampleDefinition
   );
 }
 
+const select = (category: PlaygroundCategory, example: VisualExampleDefinition) =>
+  track("playground_example_selected", {
+    example_id: example.id,
+    category,
+    api: example.api,
+  });
+
 export interface PlaygroundProps {
   /** Category tabs, in order. With one category the category row is left out. */
   readonly categories: readonly PlaygroundCategory[];
@@ -118,13 +127,25 @@ export function Playground({ categories, code, label = "Playground", className }
   const base = useId();
   const [category, setCategory] = useState(0);
   const [selected, setSelected] = useState<Partial<Record<PlaygroundCategory, number>>>({});
+  const root = useRef<HTMLElement>(null);
+  const inView = useInView(root, { threshold: 0.3, once: true });
+  const viewed = useRef(false);
 
   const categoryId = categories[category] ?? categories[0];
+  const examples = categoryId ? playgroundCategories[categoryId].examples : [];
+  const exampleIndex = (categoryId ? selected[categoryId] : undefined) ?? 0;
+  const example = examples[exampleIndex] ?? examples[0];
+
+  // Once per page view, with whichever example is showing at that moment.
+  useEffect(() => {
+    if (!inView || viewed.current || !categoryId || !example) return;
+
+    viewed.current = true;
+    track("playground_viewed", { category: categoryId, example_id: example.id });
+  }, [inView, categoryId, example]);
+
   if (!categoryId) return null;
 
-  const { examples } = playgroundCategories[categoryId];
-  const exampleIndex = selected[categoryId] ?? 0;
-  const example = examples[exampleIndex] ?? examples[0];
   const showCategories = categories.length > 1;
 
   const categoryTab = (index: number) => `${base}-category-${index}`;
@@ -136,7 +157,12 @@ export function Playground({ categories, code, label = "Playground", className }
     <TabRow
       items={examples}
       active={exampleIndex}
-      onSelect={(index) => setSelected((current) => ({ ...current, [categoryId]: index }))}
+      onSelect={(index) => {
+        const next = examples[index];
+        if (next && index !== exampleIndex) select(categoryId, next);
+
+        setSelected((current) => ({ ...current, [categoryId]: index }));
+      }}
       label={`${playgroundCategories[categoryId].label} examples`}
       idOf={exampleTab}
       panelId={examplePanel}
@@ -155,14 +181,21 @@ export function Playground({ categories, code, label = "Playground", className }
   );
 
   return (
-    <section aria-label={label} className={cn("relative", className)}>
+    <section ref={root} aria-label={label} className={cn("relative", className)}>
       <div className="relative border border-(--ek-line-strong) bg-fd-background">
         <div className="flex items-stretch">
           {showCategories ? (
             <TabRow
               items={categories}
               active={category}
-              onSelect={setCategory}
+              onSelect={(index) => {
+                const next = categories[index];
+                const first = next ? playgroundCategories[next].examples : undefined;
+                const shown = next ? (first?.[selected[next] ?? 0] ?? first?.[0]) : undefined;
+                if (next && shown && index !== category) select(next, shown);
+
+                setCategory(index);
+              }}
               label="Packages"
               idOf={categoryTab}
               panelId={categoryPanel}

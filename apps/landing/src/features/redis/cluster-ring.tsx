@@ -1,5 +1,6 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { keySlot, SLOTS } from "./key-slot";
@@ -112,6 +113,14 @@ function KeyField({
   );
 }
 
+const HASH_TAG = /\{[^}]+\}/;
+const TYPING_MS = 600;
+
+const clusterState = (a: string, b: string) => ({
+  same_slot: keySlot(a) === keySlot(b),
+  has_hash_tag: HASH_TAG.test(a) || HASH_TAG.test(b),
+});
+
 export function ClusterRing() {
   const [a, setA] = useState<string>(presets[0].a);
   const [b, setB] = useState<string>(presets[0].b);
@@ -121,6 +130,19 @@ export function ClusterRing() {
   const same = slotA === slotB;
   const nodeA = nodeOf(slotA);
   const nodeB = nodeOf(slotB);
+  const typed = useRef(false);
+
+  // Only the outcome is sent, never the keys, and only once typing settles.
+  useEffect(() => {
+    if (!typed.current) return;
+
+    const timer = window.setTimeout(() => {
+      typed.current = false;
+      track("cluster_keys_changed", { ...clusterState(a, b), via: "typed" });
+    }, TYPING_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [a, b]);
 
   return (
     <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -189,6 +211,11 @@ export function ClusterRing() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => {
+                  typed.current = false;
+                  track("cluster_keys_changed", {
+                    ...clusterState(preset.a, preset.b),
+                    via: "preset",
+                  });
                   setA(preset.a);
                   setB(preset.b);
                 }}
@@ -204,8 +231,24 @@ export function ClusterRing() {
             );
           })}
         </div>
-        <KeyField label="key a" value={a} onChange={setA} tone="a" />
-        <KeyField label="key b" value={b} onChange={setB} tone="b" />
+        <KeyField
+          label="key a"
+          value={a}
+          onChange={(value) => {
+            typed.current = true;
+            setA(value);
+          }}
+          tone="a"
+        />
+        <KeyField
+          label="key b"
+          value={b}
+          onChange={(value) => {
+            typed.current = true;
+            setB(value);
+          }}
+          tone="b"
+        />
         <div
           aria-live="polite"
           className={cn(

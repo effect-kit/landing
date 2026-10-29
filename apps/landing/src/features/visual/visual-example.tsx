@@ -4,6 +4,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { MotionConfig } from "motion/react";
 
 import { useReducedMotion } from "@/components/marketing/hooks";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { Segmented, VisualCredit } from "./chrome";
@@ -70,34 +71,107 @@ export function VisualExample({ example, code, credit = true, className }: Visua
 
   useEffect(() => () => run.dispose(), [run]);
 
+  // The run in flight, until it completes or is abandoned. Completion reports from this record,
+  // so each run sends `playground_run_completed` exactly once.
+  const active = useRef<{ startedAt: number; control: string; condition: string } | null>(null);
+  const runCount = useRef(0);
+
+  const abandon = useCallback(
+    (reason: "scrolled_away" | "control_changed") => {
+      if (!active.current) return;
+
+      active.current = null;
+      track("playground_run_abandoned", { example_id: example.id, reason });
+    },
+    [example.id],
+  );
+
+  useEffect(() => {
+    const current = active.current;
+    if (!current) return;
+
+    const outcome =
+      result._tag === "Succeeded"
+        ? "succeeded"
+        : result._tag === "Failed"
+          ? "failed"
+          : result._tag === "Interrupted"
+            ? "interrupted"
+            : result._tag === "Died"
+              ? "died"
+              : undefined;
+    if (!outcome) return;
+
+    active.current = null;
+    track("playground_run_completed", {
+      example_id: example.id,
+      outcome,
+      ...(result._tag === "Failed" || result._tag === "Died"
+        ? { error_tag: result.error.slice(0, 80) }
+        : {}),
+      duration_ms: Math.round(performance.now() - current.startedAt),
+      control_value: current.control,
+      condition_value: current.condition,
+    });
+  }, [result, example.id]);
+
   // Leaving the viewport stops the program and clears it, without a sound.
   useEffect(() => {
     const element = rootRef.current;
     if (!element) return;
 
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry && !entry.isIntersecting && run.running) run.reset({ silent: true });
+      if (entry && !entry.isIntersecting && run.running) {
+        abandon("scrolled_away");
+        run.reset({ silent: true });
+      }
     });
 
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [run]);
+  }, [run, abandon]);
 
   const onAction = () => {
     sounds.unlock();
 
-    if (result._tag === "Idle") run.start((context) => example.build(context, value, condition));
-    else if (result._tag === "Running") run.stop();
-    else run.reset();
+    if (result._tag === "Idle") {
+      runCount.current += 1;
+      active.current = { startedAt: performance.now(), control: value, condition };
+      track("playground_run_started", {
+        example_id: example.id,
+        control_value: value,
+        condition_value: condition,
+        run_index: runCount.current,
+      });
+      run.start((context) => example.build(context, value, condition));
+    } else if (result._tag === "Running") {
+      if (active.current) {
+        track("playground_run_stopped", {
+          example_id: example.id,
+          elapsed_ms: Math.round(performance.now() - active.current.startedAt),
+        });
+      }
+
+      run.stop();
+    } else run.reset();
   };
 
-  const onControl = (set: (next: string) => void) => (next: string) => {
-    sounds.unlock();
-    run.reset({ silent: true });
-    set(next);
-    void sounds.configChange();
-  };
+  const onControl =
+    (kind: "control" | "condition", previous: string, set: (next: string) => void) =>
+    (next: string) => {
+      sounds.unlock();
+      if (run.running) abandon("control_changed");
+      track("playground_control_changed", {
+        example_id: example.id,
+        kind,
+        value: next,
+        previous,
+      });
+      run.reset({ silent: true });
+      set(next);
+      void sounds.configChange();
+    };
 
   // Hovering a node highlights its code; leaving holds it briefly so the pointer can travel.
   const [hovered, setHovered] = useState<string | null>(null);
@@ -193,7 +267,7 @@ export function VisualExample({ example, code, credit = true, className }: Visua
                 label={example.control.label}
                 value={value}
                 options={example.control.options}
-                onChange={onControl(setValue)}
+                onChange={onControl("control", value, setValue)}
               />
             ) : null}
             {example.condition ? (
@@ -201,7 +275,7 @@ export function VisualExample({ example, code, credit = true, className }: Visua
                 label={example.condition.label}
                 value={condition}
                 options={example.condition.options}
-                onChange={onControl(setCondition)}
+                onChange={onControl("condition", condition, setCondition)}
               />
             ) : null}
           </div>
@@ -264,6 +338,7 @@ export function VisualExample({ example, code, credit = true, className }: Visua
             fallback={snippets[variant] ?? ""}
             target={target ?? null}
             reduced={reduced}
+            exampleId={example.id}
           />
         </div>
       </article>

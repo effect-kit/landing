@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { IsoFigure } from "@/components/iso/react/draw";
 import { asksForStillness, useInView, useLoop, useReadout } from "@/components/iso/react/live";
+import { track } from "@/lib/analytics/client";
 
 import { WHEEL_DIGITS, WHEEL_PITCH, WHEEL_W } from "./art";
 import { CLIENT_ART, SERVER_ART, bladeOf, gateOf } from "./geometry";
@@ -227,6 +228,11 @@ export function RedisWriteLive({ label, art }: Props) {
     }
     throwSwitch(s);
     setConnected(!s.open);
+    track("figure_interacted", {
+      figure: "redis_write",
+      action: "switch_thrown",
+      value: s.open ? "cut" : "restored",
+    });
     kick();
   };
 

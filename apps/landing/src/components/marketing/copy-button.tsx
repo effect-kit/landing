@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CheckIcon, CopyIcon } from "lucide-react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 const RESET_MS = 1600;
@@ -11,9 +12,15 @@ export function CopyButton({
   text,
   label = "Copy code",
   className,
+  surface = "code_window",
+  onCopied,
 }: {
   readonly text: string;
   readonly label?: string;
+  /** Reported as `copy_failed.surface` when the clipboard write is rejected. */
+  readonly surface?: string;
+  /** Called after the text reached the clipboard. */
+  readonly onCopied?: () => void;
   readonly className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -22,8 +29,15 @@ export function CopyButton({
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Denied permission or an insecure context: report it and keep the idle icon.
+      track("copy_failed", { surface });
+      return;
+    }
 
+    onCopied?.();
     setCopied(true);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setCopied(false), RESET_MS);

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RotateCcwIcon } from "lucide-react";
 
 import { useInView, useReducedMotion } from "@/components/marketing/hooks";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { ProviderMark } from "./provider-switch";
@@ -79,6 +80,16 @@ export function SendTwice() {
     started.current = true;
     schedule();
   }, [inView, reduced, schedule]);
+
+  // One run is both sends: report it when the retry lands.
+  useEffect(() => {
+    if (phase !== 2) return;
+
+    track("idempotency_demo_run", {
+      provider: modeId,
+      second_send_accepted: modes[modeId].second.ok,
+    });
+  }, [phase, modeId]);
 
   useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
 

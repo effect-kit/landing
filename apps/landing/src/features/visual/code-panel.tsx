@@ -15,6 +15,7 @@ import { animate, motion, useMotionValue, useSpring, useTransform } from "motion
 import "@shikijs/magic-move/style.css";
 
 import { CopyButton } from "@/components/marketing/copy-button";
+import { track } from "@/lib/analytics/client";
 
 const MAGIC_OPTIONS = { duration: 650, stagger: 0.3, lineNumbers: false } as const;
 const highlightSpring = { bounce: 0, visualDuration: 0.2 };
@@ -85,7 +86,10 @@ export function CodePanel({
   fallback,
   target,
   reduced,
+  exampleId,
 }: {
+  /** The example the code belongs to, reported when the code is copied. */
+  readonly exampleId: string;
   /** Every variant, tokenized by `visualCode`. Empty when the loader didn't provide them. */
   readonly steps: readonly KeyedTokensInfo[];
   readonly step: number;
@@ -163,6 +167,14 @@ export function CodePanel({
     <div className="relative">
       <CopyButton
         text={fallback}
+        surface="playground"
+        onCopied={() =>
+          track("code_copied", {
+            snippet_id: exampleId,
+            surface: "playground",
+            lines: fallback.split("\n").length,
+          })
+        }
         className="absolute top-2 right-2 z-10 bg-fd-background/80 backdrop-blur-sm"
       />
       <div className="overflow-x-auto py-5">

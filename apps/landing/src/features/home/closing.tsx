@@ -3,8 +3,9 @@ import { type ComponentType, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 
 import { EmailsLogo, type LogoProps, RedisLogo, StorageLogo } from "@/components/logos";
-import { useInView, useReducedMotion } from "@/components/marketing/hooks";
+import { useInView, useReducedMotion, useSectionView } from "@/components/marketing/hooks";
 import { Container, Eyebrow, Heading, Lede } from "@/components/marketing/section";
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 /**
@@ -155,11 +156,15 @@ function Illustration({ docked }: { readonly docked: ReadonlySet<string> }) {
   );
 }
 
+const click = (cta: string, href: string) =>
+  track("cta_clicked", { cta, location: "closing", href });
+
 const cycle: readonly (readonly string[])[] = [[], ["redis"], ["redis", "emails"], ["emails"]];
 
 export function Closing() {
   const root = useRef<HTMLElement>(null);
   const inView = useInView(root, { threshold: 0.3 });
+  useSectionView(root, "closing");
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
   const [hovered, setHovered] = useState<string | undefined>();
@@ -185,7 +190,13 @@ export function Closing() {
   });
 
   return (
-    <section ref={root} aria-labelledby="closing-title" className="border-t border-(--ek-line)">
+    <section
+      ref={root}
+      id="closing"
+      data-section=""
+      aria-labelledby="closing-title"
+      className="border-t border-(--ek-line)"
+    >
       <Container className="max-w-[1400px] py-20 md:py-28">
         <div className="relative grid border border-(--ek-line) lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <div className="ek-corners pointer-events-none absolute -inset-px" aria-hidden="true" />
@@ -199,6 +210,7 @@ export function Closing() {
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <Link
                 to="/redis"
+                onClick={() => click("redis_page", "/redis")}
                 title="Redis for Effect"
                 data-accent="redis"
                 {...hover("redis")}
@@ -209,6 +221,7 @@ export function Closing() {
               </Link>
               <Link
                 to="/emails"
+                onClick={() => click("emails_page", "/emails")}
                 title="Emails for Effect"
                 data-accent="emails"
                 {...hover("emails")}
@@ -219,6 +232,7 @@ export function Closing() {
               </Link>
               <Link
                 to="/docs"
+                onClick={() => click("docs", "/docs")}
                 title="Effect Kit documentation"
                 className="rounded-sm px-2 py-2 text-sm text-fd-muted-foreground underline decoration-(--ek-line-strong) underline-offset-4 transition-colors hover:text-fd-foreground hover:decoration-fd-foreground focus-visible:outline-2 focus-visible:outline-fd-ring"
               >

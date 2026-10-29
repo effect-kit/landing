@@ -1,6 +1,8 @@
-import type { ComponentProps, CSSProperties, ReactNode } from "react";
+import { type ComponentProps, type CSSProperties, type ReactNode, useRef } from "react";
 
 import { cn } from "@/lib/cn";
+
+import { useSectionView } from "./hooks";
 
 /** Stagger index for `[data-reveal]` elements. */
 export const revealStyle = (index: number) => ({ "--reveal-index": index }) as CSSProperties;
@@ -16,9 +18,14 @@ interface SectionProps extends ComponentProps<"section"> {
 }
 
 /** Full-bleed band, separated from its neighbours by a hairline rule. */
-export function Section({ rule = true, className, ...props }: SectionProps) {
+export function Section({ rule = true, className, id, ...props }: SectionProps) {
+  const ref = useRef<HTMLElement>(null);
+  useSectionView(ref, id);
+
   return (
     <section
+      ref={ref}
+      {...(id ? { id, "data-section": "" } : {})}
       className={cn("relative", rule && "border-t border-(--ek-line)", className)}
       {...props}
     />

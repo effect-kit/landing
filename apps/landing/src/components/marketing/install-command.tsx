@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 import { CopyButton } from "./copy-button";
@@ -78,7 +79,13 @@ export function InstallCommand({
               type="button"
               role="tab"
               aria-selected={entry === manager}
-              onClick={() => managerStore.set(entry)}
+              onClick={() => {
+                if (entry !== manager) {
+                  track("package_manager_selected", { package_manager: entry, previous: manager });
+                }
+
+                managerStore.set(entry);
+              }}
               className={cn(
                 "relative px-2.5 py-2 font-mono text-[11px] transition-colors",
                 entry === manager
@@ -119,7 +126,18 @@ export function InstallCommand({
         <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-fd-foreground">
           {command}
         </code>
-        <CopyButton text={command} label="Copy install command" />
+        <CopyButton
+          text={command}
+          label="Copy install command"
+          surface="install_command"
+          onCopied={() =>
+            track("install_command_copied", {
+              package_manager: manager,
+              packages: option?.packages ?? "",
+              option_id: option?.id ?? "",
+            })
+          }
+        />
       </div>
     </div>
   );

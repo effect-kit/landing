@@ -11,6 +11,7 @@ import {
   useLoop,
   type Spring,
 } from "@/components/iso/react/live";
+import { track } from "@/lib/analytics/client";
 
 import { KNOB_CENTRE, KNOB_SPAN, REST_POINTER, pointerOf } from "./frame";
 import { LAYERS, NAMES, REST, angleOf, lineOf, nextIndex, type Selector } from "./model";
@@ -305,6 +306,11 @@ export function KitRackLive(props: Props) {
     setIdle(false);
     setPoke((count) => count + 1);
     const next = turn(selector);
+    track("figure_interacted", {
+      figure: "kit_rack",
+      action: `${selector}_knob_turned`,
+      value: LAYERS[selector][next[selector]] ?? "",
+    });
     send(selector);
     setSpoken(
       `${NAMES[selector]} now provides ${LAYERS[selector][next[selector]]}. The program is unchanged.`,
