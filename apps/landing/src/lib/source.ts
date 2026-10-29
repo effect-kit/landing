@@ -1,9 +1,9 @@
 import { llms, loader } from "fumadocs-core/source";
-import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { pageSchema } from "fumadocs-core/source/schema";
 import { defineDocs } from "fumadocs-mdx/macro";
 import { z } from "zod";
 
+import { docsIcon } from "./docs-icons";
 import { docsRoute } from "./shared";
 import { absolute } from "./site";
 
@@ -29,7 +29,7 @@ export const docs = defineDocs({
 export const source = loader({
   source: docs.toFumadocsSource(),
   baseUrl: docsRoute,
-  plugins: [lucideIconsPlugin()],
+  icon: docsIcon,
 });
 
 /** Plain-Markdown views of the docs for agents: llms.txt, llms-full.txt and `.md` pages. */

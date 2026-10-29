@@ -25,3 +25,4 @@ minimumReleaseAgeExclude:
   - effect@4.0.7
   - "@effect-kit/redis@0.1.0"
   - "@effect-kit/emails@0.1.0"
+  - "@hugeicons/core-free-icons@4.4.0"

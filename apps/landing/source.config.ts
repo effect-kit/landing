@@ -7,6 +7,8 @@ import { effectKitDark, effectKitLight } from "./src/themes/code";
 
 export default defineConfig({
   mdxOptions: {
+    // One package manager choice for every install block on the site.
+    remarkNpmOptions: { persist: { id: "package-manager" } },
     rehypeCodeOptions: {
       themes: {
         light: effectKitLight,
