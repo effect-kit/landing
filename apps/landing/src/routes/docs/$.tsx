@@ -5,14 +5,22 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { useFumadocsLoader } from "fumadocs-core/source/client";
 import { DocsLayout } from "fumadocs-ui/layouts/spacious";
-import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/spacious/page";
+import {
+  DocsBody,
+  DocsDescription,
+  DocsPage,
+  DocsTitle,
+  MarkdownCopyButton,
+  ViewOptionsPopover,
+} from "fumadocs-ui/layouts/spacious/page";
 
 import { useMDXComponents } from "@/components/mdx";
 import { baseOptions } from "@/lib/layout.shared";
 import { docsImageUrl } from "@/lib/og/urls";
 import { getPackage } from "@/lib/packages";
 import { breadcrumbLd, SEPARATOR, seo, techArticleLd } from "@/lib/seo";
-import { site } from "@/lib/site";
+import { getPageMarkdownUrl, gitConfig } from "@/lib/shared";
+import { absolute, site } from "@/lib/site";
 import { docs, source } from "@/lib/source";
 import { tabs } from "@/lib/tabs";
 
@@ -74,7 +82,7 @@ export const Route = createFileRoute("/docs/$")({
       ...meta.keywords,
     ];
 
-    return seo({
+    const tags = seo({
       title,
       description: meta.description,
       path: meta.url,
@@ -102,10 +110,20 @@ export const Route = createFileRoute("/docs/$")({
         ]),
       ],
     });
+
+    // Point agents at the Markdown version of this page.
+    return {
+      ...tags,
+      links: [
+        ...tags.links,
+        { rel: "alternate", type: "text/markdown", href: absolute(getPageMarkdownUrl(meta)) },
+      ],
+    };
   },
 });
 
-function Content({ path }: { path: string }) {
+function Content({ path, slugs }: { path: string; slugs: readonly string[] }) {
+  const markdownUrl = getPageMarkdownUrl({ slugs });
   const page = docs.getPage(path);
   if (!page) throw new Error(`Unknown page: ${path}`);
 
@@ -116,6 +134,13 @@ function Content({ path }: { path: string }) {
     <DocsPage toc={toc}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
+      <div className="flex flex-row flex-wrap items-center gap-2 border-b pb-6">
+        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        <ViewOptionsPopover
+          markdownUrl={markdownUrl}
+          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/landing/content/docs/${path}`}
+        />
+      </div>
       <DocsBody>
         <MDX components={useMDXComponents()} />
       </DocsBody>
@@ -124,12 +149,14 @@ function Content({ path }: { path: string }) {
 }
 
 function Page() {
-  const { path, pageTree, packageSlug } = useFumadocsLoader(Route.useLoaderData());
+  const data = useFumadocsLoader(Route.useLoaderData());
+  const { path, pageTree, packageSlug } = data;
+  const slugs = data.meta.slugs;
 
   return (
     <DocsLayout {...baseOptions(getPackage(packageSlug))} tree={pageTree} tabs={tabs}>
       <Suspense>
-        <Content path={path} />
+        <Content path={path} slugs={slugs} />
       </Suspense>
     </DocsLayout>
   );

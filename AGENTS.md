@@ -30,6 +30,9 @@
   (`effect-kit/redis`, `effect-kit/emails`, `effect-kit/storage`). Check APIs, error names
   and capabilities before writing copy or snippets; never invent numbers.
 - Keep copy short and plain. No em dashes, no marketing buzzwords.
+- Agents read the site as Markdown: `/llms.txt`, `/llms-full.txt`, `.md` URLs and
+  `Accept: text/markdown`. When a landing page changes, update
+  `src/content/landing-markdown.ts` to match; docs Markdown is generated from the MDX.
 - Each page has one accent (blue for the kit, red for Redis, amber for emails) set with
   `data-accent`. Support dark and light themes, phone widths and reduced motion.
 
