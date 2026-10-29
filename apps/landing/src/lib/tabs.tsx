@@ -9,7 +9,8 @@ export const tabs: GetLayoutTabsOptions = {
 
     return {
       ...option,
-      icon: <pkg.Logo className="size-full" />,
+      // Each package shows its own accent, whichever docs are open.
+      icon: <pkg.Logo data-accent={pkg.slug} className="size-full text-ek-accent" />,
     };
   },
 };

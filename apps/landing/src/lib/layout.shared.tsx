@@ -17,7 +17,7 @@ export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
     nav: {
       title: (
         <>
-          <Logo className="size-6" />
+          <Logo className={pkg ? "size-6 text-ek-accent" : "size-6"} />
           <span className="font-semibold">
             {appName}
             {pkg ? (

@@ -57,6 +57,13 @@
   --color-fd-ring: oklch(70% 0.16 252);
 }
 
+/* Docs use the package accent for active links, the TOC, tabs, buttons and focus rings. */
+html[data-docs] {
+  --color-fd-primary: var(--ek-accent);
+  --color-fd-primary-foreground: var(--ek-accent-ink);
+  --color-fd-ring: var(--ek-accent);
+}
+
 html {
   scrollbar-gutter: stable;
   font-feature-settings: "cv11", "ss01";

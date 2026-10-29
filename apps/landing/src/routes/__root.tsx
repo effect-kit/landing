@@ -1,11 +1,19 @@
 import type { ReactNode } from "react";
 
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 
 import SearchDialog from "@/components/search";
+import { getPackageFromUrl } from "@/lib/packages";
 import { pageTitle } from "@/lib/seo";
+import { docsRoute } from "@/lib/shared";
 import { site } from "@/lib/site";
 
 import appCss from "@/styles/app.css?url";
@@ -45,8 +53,19 @@ const theme = { defaultTheme: "dark" } as const;
 const search = { SearchDialog } as const;
 
 function RootDocument({ children }: { children: ReactNode }) {
+  // Docs take their package's accent. It sits on <html> rather than the layout so the search
+  // dialog and popovers, which render in portals, pick it up too.
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isDocs = pathname === docsRoute || pathname.startsWith(`${docsRoute}/`);
+  const accent = isDocs ? getPackageFromUrl(pathname)?.slug : undefined;
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-docs={isDocs ? "" : undefined}
+      data-accent={accent}
+      suppressHydrationWarning
+    >
       <head>
         <HeadContent />
       </head>
