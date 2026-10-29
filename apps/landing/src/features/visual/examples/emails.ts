@@ -102,6 +102,14 @@ export const emailsCapability: VisualExampleDefinition = {
     ],
     initial: "resend",
   },
+  condition: {
+    label: "Rate limit",
+    options: [
+      { value: "under", label: "Under limit" },
+      { value: "over", label: "Over limit" },
+    ],
+    initial: "under",
+  },
   code: (provider) => provider,
   nodes: [
     { id: "check", label: "capabilities", highlight: always("attachments: [invoice]") },
@@ -123,7 +131,7 @@ export const emailsCapability: VisualExampleDefinition = {
       : error instanceof EmailError
         ? error.reason._tag
         : tagOf(error),
-  build: ({ step }, providerId) => {
+  build: ({ step }, providerId, rateLimit) => {
     const provider = getEmailProvider(providerId === "mailersend" ? "mailersend" : "resend");
 
     const email = {
@@ -148,9 +156,21 @@ export const emailsCapability: VisualExampleDefinition = {
 
           return yield* step(
             "request",
-            Effect.sleep(ROUND_TRIP * 1.5).pipe(
-              Effect.as({ provider: provider.id, status: "accepted" as const }),
-            ),
+            Effect.gen(function* () {
+              yield* Effect.sleep(ROUND_TRIP * 1.5);
+
+              // The provider answered 429: it saw the request and turned it away.
+              if (rateLimit === "over") {
+                return yield* new EmailError({
+                  provider: provider.id,
+                  operation: "send",
+                  acceptance: "rejected",
+                  reason: new RateLimitedError({ retryAfter: Duration.seconds(1) }),
+                });
+              }
+
+              return { provider: provider.id, status: "accepted" as const };
+            }),
             (receipt) => receipt.status,
           );
         }),

@@ -29,6 +29,8 @@ export interface VisualExampleDefinition {
   /** One short plain line under the title. */
   readonly description: string;
   readonly control?: VisualControl;
+  /** A simulated backend condition: it changes how the provider or server behaves, not the code. */
+  readonly condition?: VisualControl;
   /** Snippet variant (a key of `visualSnippets[id]`) for a control value. */
   readonly code: (value: string) => string;
   readonly nodes: readonly VisualNode[];
@@ -40,7 +42,11 @@ export interface VisualExampleDefinition {
   /** One line about what is simulated, shown under the nodes. */
   readonly simulated: string;
   readonly describeError: (error: unknown) => string;
-  readonly build: (context: RunContext, value: string) => Effect.Effect<string, unknown>;
+  readonly build: (
+    context: RunContext,
+    value: string,
+    condition: string,
+  ) => Effect.Effect<string, unknown>;
 }
 
 export const always =

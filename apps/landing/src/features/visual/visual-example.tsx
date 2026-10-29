@@ -55,6 +55,7 @@ export function VisualExample({ example, code, credit = true, className }: Visua
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLElement>(null);
   const [value, setValue] = useState(example.control?.initial ?? "");
+  const [condition, setCondition] = useState(example.condition?.initial ?? "");
 
   const [run] = useState(
     () =>
@@ -86,15 +87,15 @@ export function VisualExample({ example, code, credit = true, className }: Visua
   const onAction = () => {
     sounds.unlock();
 
-    if (result._tag === "Idle") run.start((context) => example.build(context, value));
+    if (result._tag === "Idle") run.start((context) => example.build(context, value, condition));
     else if (result._tag === "Running") run.stop();
     else run.reset();
   };
 
-  const onControl = (next: string) => {
+  const onControl = (set: (next: string) => void) => (next: string) => {
     sounds.unlock();
     run.reset({ silent: true });
-    setValue(next);
+    set(next);
     void sounds.configChange();
   };
 
@@ -185,14 +186,24 @@ export function VisualExample({ example, code, credit = true, className }: Visua
           onAction={onAction}
         />
 
-        {example.control ? (
-          <div className="border-t border-(--ek-line) bg-zinc-50 px-4 py-4 sm:px-6 dark:bg-zinc-900/50">
-            <Segmented
-              label={example.control.label}
-              value={value}
-              options={example.control.options}
-              onChange={onControl}
-            />
+        {example.control || example.condition ? (
+          <div className="flex flex-wrap gap-x-8 gap-y-3 border-t border-(--ek-line) bg-zinc-50 px-4 py-4 sm:px-6 dark:bg-zinc-900/50">
+            {example.control ? (
+              <Segmented
+                label={example.control.label}
+                value={value}
+                options={example.control.options}
+                onChange={onControl(setValue)}
+              />
+            ) : null}
+            {example.condition ? (
+              <Segmented
+                label={example.condition.label}
+                value={condition}
+                options={example.condition.options}
+                onChange={onControl(setCondition)}
+              />
+            ) : null}
           </div>
         ) : null}
 
