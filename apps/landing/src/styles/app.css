@@ -65,6 +65,17 @@ html[data-docs] {
   --color-fd-ring: var(--ek-accent);
 }
 
+/* Docs sidebar section labels: mono eyebrows in a muted package accent, so sections read apart. */
+#nd-sidebar p,
+#nd-sidebar-mobile p {
+  margin-top: 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--ek-accent) 70%, var(--color-fd-muted-foreground));
+}
+
 html {
   scrollbar-gutter: stable;
   font-feature-settings: "cv11", "ss01";

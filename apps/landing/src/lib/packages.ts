@@ -8,8 +8,6 @@ export interface PackageInfo {
   /** Root folder under `content/docs`, also the URL segment and search tag. */
   readonly slug: string;
   readonly name: string;
-  /** `owner/repo` on GitHub. */
-  readonly repo: string;
   readonly Logo: ComponentType<LogoProps>;
   /** Whether `content/docs/<slug>` exists yet. */
   readonly hasDocs: boolean;
@@ -21,7 +19,6 @@ export const packages: readonly PackageInfo[] = [
   {
     slug: "redis",
     name: "Redis",
-    repo: "effect-kit/redis",
     Logo: RedisLogo,
     hasDocs: true,
     page: "/redis",
@@ -29,7 +26,6 @@ export const packages: readonly PackageInfo[] = [
   {
     slug: "emails",
     name: "Emails",
-    repo: "effect-kit/emails",
     Logo: EmailsLogo,
     hasDocs: true,
     page: "/emails",
@@ -37,7 +33,6 @@ export const packages: readonly PackageInfo[] = [
   {
     slug: "storage",
     name: "Storage",
-    repo: "effect-kit/storage",
     Logo: StorageLogo,
     hasDocs: false,
   },
@@ -54,8 +49,4 @@ export function getPackageFromUrl(url: string): PackageInfo | undefined {
   if (!url.startsWith(`${docsRoute}/`)) return undefined;
 
   return getPackage(url.slice(docsRoute.length + 1).split("/")[0]);
-}
-
-export function getRepoUrl(pkg: PackageInfo): string {
-  return `https://github.com/${pkg.repo}`;
 }

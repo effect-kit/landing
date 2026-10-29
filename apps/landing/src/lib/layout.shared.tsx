@@ -1,14 +1,13 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
-import { GitHubIcon } from "@/components/icons/github-icon";
 import { EffectKitLogo } from "@/components/logos";
 
-import { getRepoUrl, type PackageInfo } from "./packages";
+import type { PackageInfo } from "./packages";
 import { appName, gitConfig } from "./shared";
 
 /**
  * Shared layout options. Pass the active package on docs pages to brand the nav
- * with its logo and name, and to link its repository from the sidebar.
+ * with its logo and name.
  */
 export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
   const Logo = pkg?.Logo ?? EffectKitLogo;
@@ -28,17 +27,5 @@ export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
       ),
     },
     githubUrl: `https://github.com/${gitConfig.user}`,
-    links: pkg
-      ? [
-          {
-            type: "main",
-            on: "menu",
-            text: pkg.repo,
-            url: getRepoUrl(pkg),
-            icon: <GitHubIcon />,
-            external: true,
-          },
-        ]
-      : [],
   };
 }
