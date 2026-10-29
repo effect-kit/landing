@@ -1,0 +1,74 @@
+---
+title: Lua scripts
+description: Run Lua scripts by hash with automatic loading, and call server functions.
+keywords: [EVAL, EVALSHA, FCALL, Lua, RedisScript]
+---
+
+A `RedisScript` pairs Lua source with a reply decoder. `RedisScripts.execute` runs it with EVALSHA, which sends a 40-character SHA-1 hash instead of the source. If the server does not have the script yet, it loads it and runs it once more.
+
+**Example** (Running a Counter Script)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { RedisScript, RedisScripts, Reply } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const scripts = yield* RedisScripts;
+
+  const increment = yield* RedisScript.make({
+    source: "return redis.call('INCR', KEYS[1])",
+    decode: Reply.integer,
+  });
+
+  const count = yield* scripts.execute(increment, { keys: ["counter"] });
+  //    ^?
+
+  return count;
+});
+```
+
+`RedisScript.make` computes the SHA-1 hash, which needs the Effect `Crypto` service. The `RedisNode` and `RedisBun` layers provide it, so the script builds in the same program. `execute` takes `keys` and optional `args`. Declare every key in `keys`, not in `args`, so cluster routing can find it.
+
+## Arguments and decoders
+
+`args` accepts strings and bytes. The decoder turns the reply into the success type. `Reply.optional(Reply.text)` gives `Option<string>` for a script that may return nil.
+
+**Example** (Reading a Value With a Read-Only Script)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { RedisScript, RedisScripts, Reply } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const scripts = yield* RedisScripts;
+
+  const read = yield* RedisScript.make({
+    source: "return redis.call('GET', KEYS[1])",
+    readOnly: true,
+    decode: Reply.optional(Reply.text),
+  });
+
+  return yield* scripts.execute(read, { keys: ["greeting"] });
+});
+```
+
+`readOnly: true` runs the script with EVALSHA_RO. Servers older than 7.0.0 reject it with a `ServerError`.
+
+## Failures
+
+A failure that is not a missing script is returned as it is, and a decoder error never causes a second send. A script that raises an error fails with `ServerError`, and any write it made before the error stays applied.
+
+<Callout type="warn" title="Scripts are not rolled back">
+  A script is atomic while it runs, but an error does not undo earlier writes. The package tests
+  show an `INCR` before an `error(...)` call stays applied.
+</Callout>
+
+## One-off scripts and functions
+
+For a script you run once, `redis.evalScript(source, { keys, args }, decoder)` sends the source with EVAL. `redis.evalSha`, `redis.evalReadOnly` and `redis.fcall(name, input, decoder)` cover EVALSHA, EVAL_RO and FUNCTION calls. `redis.evalSha` sends the command as written. If the server lacks the script, it fails with a `ServerError` whose `code` is `NOSCRIPT`, and nothing loads it for you.
+
+## Sharing loads across connections
+
+Each leased connection loads a script into the server on first use. With `scripts: { loadScope: "server" }` in the layer settings, loads are shared between leases. Set it only when every lease reaches the same physical server. The default is `"connection"`.

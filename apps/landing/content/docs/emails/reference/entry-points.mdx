@@ -1,0 +1,52 @@
+---
+title: Entry points
+description: Every import path of @effect-kit/emails and what each one exports.
+---
+
+`@effect-kit/emails` is ESM only and needs Node.js 24.22.0 or later. The root, `testing` and `react` entry points never import a provider. Each provider has its own subpath, so an SDK you do not use is never loaded.
+
+## `@effect-kit/emails`
+
+| Group        | Exports                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service      | `Email`, and the types `EmailService` and `EmailAdapter`                                                                                                                                                                                                                                                                                                                                                                     |
+| Batch        | `BatchOptions`, `EmailRequest`, and the type `SendOutcome`                                                                                                                                                                                                                                                                                                                                                                   |
+| Message      | `EmailMessage`, `Address`, `Mailbox`, `Recipients`, `EmailAddress`, `Attachment`, `CustomHeaders`, `SendOptions`, and the type `NormalizedEmailMessage`                                                                                                                                                                                                                                                                      |
+| Capabilities | `EmailCapabilities`, `Idempotency`, `RetryAfter`                                                                                                                                                                                                                                                                                                                                                                             |
+| Receipts     | `SendReceipt`, `SubmissionReference`, `RecipientOutcome`, `RecipientPosition`, `ProviderName`, `ProviderCode`                                                                                                                                                                                                                                                                                                                |
+| Errors       | `EmailError`, `EmailErrorReason`, `EmailFeature`, `BatchError`, and the fourteen reasons: `InvalidMessageError`, `UnsupportedFeatureError`, `AuthenticationError`, `PermissionDeniedError`, `RateLimitedError`, `QuotaExceededError`, `RecipientRejectedError`, `MessageRejectedError`, `IdempotencyConflictError`, `TransportError`, `TimeoutError`, `ProviderUnavailableError`, `UnexpectedResponseError`, `ProviderError` |
+
+`Email.sendMany` and `Email.make` are static members of `Email`.
+
+## `@effect-kit/emails/testing`
+
+`EmailTest`, and the types `EmailTestOptions` and `EmailTestService`. See [Testing](/docs/emails/testing).
+
+## `@effect-kit/emails/react`
+
+`render`, `RenderError`, `RenderOptions`, and the types `HtmlContent`, `TextContent`, `HtmlAndTextContent` and `RenderedContent`. Rendering needs `@react-email/render`, `react` and `react-dom`.
+
+## Provider subpaths
+
+Every provider exports `layer`, `layerClient` and `layerConfig`, plus types for its options and client. The Layers are in [Layers and environment variables](/docs/emails/reference/layers).
+
+| Subpath                                      | Also exports                                                                                                                        |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `@effect-kit/emails/resend`                  | `ResendConfigurationError`, `ResendConfig`, `ResendClient`, `ResendMessage`, `ClientOptions`                                        |
+| `@effect-kit/emails/nodemailer`              | `NodemailerConfigurationError`, `NodemailerConfig`, `NodemailerClient`, `NodemailerMessage`, `SmtpTransportConfig`, `ClientOptions` |
+| `@effect-kit/emails/ses`                     | `SesConfigurationError`, `SesConfig`, `SesClient`, `SesMessage`, `AwsCredentials`, `ClientOptions`                                  |
+| `@effect-kit/emails/azure`                   | `AzureConfigurationError`, `AzureConfig`, `AzureClient`, `AzurePoller`, `AzureMessage`, `ClientOptions`                             |
+| `@effect-kit/emails/postmark`                | `ProviderConfigurationError`, `PostmarkConfig`, `PostmarkClient`, `ClientOptions`                                                   |
+| `@effect-kit/emails/sendgrid`                | `ProviderConfigurationError`, `SendGridConfig`, `SendGridClient`, `ClientOptions`                                                   |
+| `@effect-kit/emails/mailgun`                 | `ProviderConfigurationError`, `MailgunConfig`, `MailgunClient`, `ClientOptions`                                                     |
+| `@effect-kit/emails/mailersend`              | `ProviderConfigurationError`, `MailerSendConfig`, `MailerSendClient`, `ClientOptions`                                               |
+| `@effect-kit/emails/brevo`                   | `ProviderConfigurationError`, `BrevoConfig`, `BrevoClient`, `ClientOptions`                                                         |
+| `@effect-kit/emails/mailtrap`                | `ProviderConfigurationError`, `MailtrapConfig`, `MailtrapClient`, `ClientOptions`                                                   |
+| `@effect-kit/emails/scaleway`                | `ProviderConfigurationError`, `ScalewayConfig`, `ScalewayClient`, `ClientOptions`                                                   |
+| `@effect-kit/emails/lettermint`              | `ProviderConfigurationError`, `LettermintConfig`, `LettermintClient`, `ClientOptions`                                               |
+| `@effect-kit/emails/eusend`                  | `ProviderConfigurationError`, `EusendConfig`, `EusendClient`, `ClientOptions`                                                       |
+| `@effect-kit/emails/zeptomail`               | `ProviderConfigurationError`, `ZeptoMailConfig`, `ZeptoMailClient`, `ClientOptions`                                                 |
+| `@effect-kit/emails/mailchimp-transactional` | `ProviderConfigurationError`, `MailchimpTransactionalConfig`, `MailchimpTransactionalClient`, `ClientOptions`                       |
+| `@effect-kit/emails/plunk`                   | `ProviderConfigurationError`, `PlunkConfig`, `PlunkClient`, `ClientOptions`                                                         |
+
+Importing a provider subpath without its SDK installed fails with `ERR_MODULE_NOT_FOUND`. The root and `testing` still import.

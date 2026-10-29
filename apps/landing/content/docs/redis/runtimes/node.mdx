@@ -1,0 +1,122 @@
+---
+title: Node.js
+description: Connect to Redis from Node.js over TCP, TLS or a Unix socket with RedisNode.
+keywords: [node:net, node:tls, mTLS, Unix socket]
+---
+
+`RedisNode` builds layers on `node:net` and `node:tls`. It needs Node.js `24.22.0` or later (`engines.node` is `>=24.22.0`) and supports every feature of the package.
+
+**Example** (Creating the Node.js Layer)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.ping();
+});
+
+export const runnable = program.pipe(Effect.provide(RedisLive));
+```
+
+## Creating the layer
+
+`RedisNode` has six constructors. The `Config` variants take an Effect `Config` of the same input.
+
+| Constructor                                                | Builds a layer for                            |
+| ---------------------------------------------------------- | --------------------------------------------- |
+| `RedisNode.layer`, `RedisNode.layerConfig`                 | One standalone server                         |
+| `RedisNode.layerCluster`, `RedisNode.layerClusterConfig`   | A [cluster](/docs/redis/cluster)              |
+| `RedisNode.layerSentinel`, `RedisNode.layerSentinelConfig` | A [Sentinel](/docs/redis/sentinel) deployment |
+
+<Callout type="warn" title="The layer export is the transport">
+  `layer` exported from `@effect-kit/redis/node` is the transport, not a client. Build clients with
+  `RedisNode.layer(...)`.
+</Callout>
+
+## Provided services
+
+`RedisNode.layer` provides the full set of services for a standalone server.
+
+**Example** (The Services a Node.js Layer Provides)
+
+```ts twoslash
+import type { Layer } from "effect";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+type Provided = Layer.Success<typeof RedisLive>;
+//   ^?
+```
+
+`RedisTracking`, `RedisCache`, `RedisSearch` and `RedisMonitor` are not in the set. You add them yourself.
+
+## Transport options
+
+The transport opens one TCP, TLS or Unix socket per connection.
+
+- **TCP**: `url: "redis://host:6379"` or `endpoint: { host, port }`.
+- **TLS**: `url: "rediss://host:6380"`, or `endpoint` with `tls`. A `rediss:` URL verifies the certificate.
+- **Unix socket**: `endpoint: { path: "/var/run/redis/redis.sock" }`. Cluster and Sentinel need TCP endpoints.
+
+<TypeTable
+  type={{
+    serverName: {
+      type: "string",
+      description:
+        "Server name for certificate verification. Defaults to the host when it is not an IP address.",
+      required: false,
+    },
+    ca: {
+      type: "string",
+      description: "PEM certificate authority. Stored as a Redacted value.",
+      required: false,
+    },
+    certificate: {
+      type: "string",
+      description: "PEM client certificate. Must be given with privateKey.",
+      required: false,
+    },
+    privateKey: {
+      type: "string",
+      description: "PEM client key. Must be given with certificate.",
+      required: false,
+    },
+    rejectUnauthorized: {
+      type: "boolean",
+      description: "Reject a server certificate that fails verification.",
+      default: "true",
+      required: false,
+    },
+  }}
+/>
+
+**Example** (Connecting With a Client Certificate)
+
+```ts twoslash
+import { Config } from "effect";
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layerConfig(
+  Config.all({
+    endpoint: Config.all({
+      host: Config.String("REDIS_HOST"),
+      port: Config.Int("REDIS_PORT"),
+      tls: Config.all({
+        ca: Config.String("REDIS_CA"),
+        certificate: Config.String("REDIS_CERT"),
+        privateKey: Config.String("REDIS_KEY"),
+      }),
+    }),
+  }),
+);
+```
+
+## Tested version
+
+The package is tested on Node.js `24.22.0`, against the servers listed in [Compatibility](/docs/redis/servers).

@@ -1,0 +1,37 @@
+---
+title: HyperLogLog
+description: Look up the HyperLogLog commands for approximate distinct counts and their reply types.
+---
+
+A HyperLogLog estimates how many distinct elements it has seen in a small, fixed amount of memory.
+
+**Example** (Counting Distinct Visitors)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const changed = yield* redis.pfadd("uniques:mon", ["ada", "grace", "linus"]);
+  //    ^?
+  const estimate = yield* redis.pfcount(["uniques:mon"]);
+  //    ^?
+
+  yield* redis.pfmerge("uniques:week", ["uniques:mon", "uniques:tue"]);
+
+  return { changed, estimate };
+});
+```
+
+`pfadd` returns `true` when the estimate changed. `pfcount` takes a non-empty tuple of keys and returns the estimate for their union as a `bigint`.
+
+## Methods
+
+| Method          | Command   | Reply type | Purpose                                               |
+| --------------- | --------- | ---------- | ----------------------------------------------------- |
+| `redis.pfadd`   | `PFADD`   | `boolean`  | Add elements; true if the estimate changed.           |
+| `redis.pfcount` | `PFCOUNT` | `bigint`   | Return the estimated cardinality of one or more keys. |
+| `redis.pfmerge` | `PFMERGE` | `void`     | Merge several keys into a destination key.            |

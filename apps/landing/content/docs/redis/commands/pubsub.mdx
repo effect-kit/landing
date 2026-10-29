@@ -1,0 +1,79 @@
+---
+title: Pub/Sub
+description: Look up the publish and inspection commands on Redis and the subscribe methods on RedisPubSub.
+---
+
+Publishing and inspecting channels are ordinary commands on the `Redis` service. Subscribing holds a connection open, so it lives on `RedisPubSub`.
+
+**Example** (Publishing and Subscribing)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+
+import { Redis, RedisPubSub } from "@effect-kit/redis";
+
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const redis = yield* Redis;
+    const pubsub = yield* RedisPubSub;
+
+    const subscription = yield* pubsub.subscribe(["orders"]);
+
+    const receivers = yield* redis.publish("orders", "order-1");
+    //    ^?
+
+    const first = yield* subscription.messages.pipe(Stream.take(1), Stream.runCollect);
+    //    ^?
+
+    return { receivers, first };
+  }),
+);
+```
+
+`subscribe` needs a `Scope` and closes the subscription when the scope ends. For delivery gaps, limits and reconnects, see [Pub/Sub](/docs/redis/pubsub).
+
+## Methods on `Redis`
+
+| Method                      | Command                | Reply type                                   | Purpose                                                       |
+| --------------------------- | ---------------------- | -------------------------------------------- | ------------------------------------------------------------- |
+| `redis.publish`             | `PUBLISH`              | `bigint`                                     | Publish a message to a channel and return the receiver count. |
+| `redis.spublish`            | `SPUBLISH`             | `bigint`                                     | Publish a message to a shard channel.                         |
+| `redis.pubsubChannels`      | `PUBSUB CHANNELS`      | `readonly Uint8Array[]`                      | List active channels, optionally by pattern.                  |
+| `redis.pubsubNumSub`        | `PUBSUB NUMSUB`        | `readonly (readonly [Uint8Array, bigint])[]` | Count subscribers per channel.                                |
+| `redis.pubsubNumPat`        | `PUBSUB NUMPAT`        | `bigint`                                     | Count pattern subscriptions.                                  |
+| `redis.pubsubShardChannels` | `PUBSUB SHARDCHANNELS` | `readonly Uint8Array[]`                      | List active shard channels.                                   |
+| `redis.pubsubShardNumSub`   | `PUBSUB SHARDNUMSUB`   | `readonly (readonly [Uint8Array, bigint])[]` | Count subscribers per shard channel.                          |
+| `redis.pubsubHelp`          | `PUBSUB HELP`          | `readonly string[]`                          | Return the PUBSUB help text.                                  |
+
+## Methods on `RedisPubSub`
+
+| Method                 | Command      | Reply type                                                              | Purpose                                                                                   |
+| ---------------------- | ------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `pubsub.subscribe`     | `SUBSCRIBE`  | `{ events; messages; close }`                                           | Subscribe to channels. `mode: "pattern"` or `"shard"` sends `PSUBSCRIBE` or `SSUBSCRIBE`. |
+| `pubsub.psubscribe`    | `PSUBSCRIBE` | `{ events; messages; close }`                                           | Subscribe to patterns.                                                                    |
+| `pubsub.ssubscribe`    | `SSUBSCRIBE` | `{ events; messages; close }`                                           | Subscribe to shard channels.                                                              |
+| `pubsub.unknownPushes` | none         | `Stream<{ generation; value: RespValue }>`                              | Pushes the client did not recognize.                                                      |
+| `pubsub.snapshot`      | none         | `Effect<{ generation; listeners; retiring; interests; retainedBytes }>` | Counters for the current connection.                                                      |
+
+`subscribe`, `psubscribe` and `ssubscribe` return an `Effect` that needs a `Scope`. `events` carries `Ready` and `DeliveryGap` events as well as messages. `messages` carries only messages and fails with a `SubscriptionError` on a gap.
+
+## `SubscribeOptions`
+
+<TypeTable
+  type={{
+    mode: {
+      type: '"channel" | "pattern" | "shard"',
+      description: "What the targets are.",
+      required: false,
+    },
+    recovery: {
+      type: '"fail" | "resubscribe"',
+      description: "What to do after a lost connection.",
+      required: false,
+    },
+  }}
+/>
+
+`PubSubMessage` has `_tag` of `"Message"`, `"PatternMessage"` or `"ShardMessage"`, plus `channel: Uint8Array`, `payload: Uint8Array`, `attributes` and `generation`. `PatternMessage` also has `pattern`. `SubscriptionEvent` adds `{ _tag: "Ready" }` and `{ _tag: "DeliveryGap" }`.
+
+Subscription limits are set under [`subscriptions`](/docs/redis/reference/configuration#subscriptions). Upstash has no `RedisPubSub`. Use `UpstashEvents.subscribe` from `@effect-kit/redis/upstash`, which takes one channel and yields text.

@@ -1,0 +1,75 @@
+---
+title: Engines
+description: Declare which server engine you run with RedisProfiles, and what each profile enforces.
+keywords: [Valkey, Dragonfly, KeyDB, Redict, Garnet, Kvrocks, profile]
+---
+
+A **profile** is a static description of a deployment. You pass one to a layer as `profile`, and the client applies its rules before it sends anything. Profiles never ask the server what it is.
+
+**Example** (Declaring a Valkey Engine)
+
+```ts twoslash
+import { RedisProfiles } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "redis://localhost:6379",
+  profile: RedisProfiles.valkey({ modules: ["json"] }),
+});
+```
+
+Profiles are optional. Without one, the client sends every command and the server decides.
+
+## Engine profiles
+
+| Profile                   | Accepted `routing`                        |
+| ------------------------- | ----------------------------------------- |
+| `RedisProfiles.redis`     | `"standalone"`, `"cluster"`, `"sentinel"` |
+| `RedisProfiles.valkey`    | `"standalone"`, `"cluster"`, `"sentinel"` |
+| `RedisProfiles.dragonfly` | `"standalone"`                            |
+| `RedisProfiles.keydb`     | `"standalone"`                            |
+| `RedisProfiles.redict`    | `"standalone"`                            |
+| `RedisProfiles.garnet`    | `"standalone"`                            |
+| `RedisProfiles.kvrocks`   | `"standalone"`                            |
+
+An engine profile leaves TLS and authentication optional, allows any database, and restricts no command. Its checks are about how you connect:
+
+- A profile whose `routing` does not match the layer fails with `ProfileError` and `reason: "routing"`. A standalone profile does not work with `layerCluster`.
+- `modules` lists the modules your server really has. A command from a module that is not in the list fails with `ProfileError` and `reason: "module"` before it is sent. Without `modules`, the server decides.
+
+All `ProfileError` failures have `delivery: "unsent"`.
+
+## Engine-specific rules
+
+The only command rule in an engine profile is for Garnet. The Garnet profile rejects `ZSCAN` with `NOSCORES`, because Garnet `v2.2.4` ignores the flag, and typed replies could then not tell scores from members. The command fails with `ProfileError` and `reason: "restricted-command"`.
+
+Everything else an engine does not implement comes back from the server as a `ServerError`.
+
+**Example** (Rejecting a Module Command Before Sending)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis, RedisProfiles } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({
+  url: "redis://localhost:6379",
+  profile: RedisProfiles.redis({ modules: ["json"] }),
+});
+
+export const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.ftList();
+}).pipe(
+  Effect.catchTag("ProfileError", (error) =>
+    error.reason === "module" ? Effect.succeed([]) : Effect.fail(error),
+  ),
+  Effect.provide(RedisLive),
+);
+```
+
+## How engines are tested
+
+Each engine runs the package's conformance cases once, on the version listed in [Compatibility](/docs/redis/servers). The cases cover strings, keys, collections, ordered sets, sessions, events, modules and administration, over RESP2 and RESP3, on Node.js and Bun. Garnet also runs a case with its Lua support enabled.
+
+Dragonfly, KeyDB, Redict, Garnet and Kvrocks run with no modules. Do not expect JSON or Search on them.

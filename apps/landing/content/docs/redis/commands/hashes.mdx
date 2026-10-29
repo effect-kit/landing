@@ -1,0 +1,97 @@
+---
+title: Hashes
+description: Look up the hash commands, including field expiry, with their commands and reply types.
+---
+
+Hash commands store field and value pairs under one key. Fields and values come back as bytes unless the method says text.
+
+**Example** (Writing and Reading Hash Fields)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const added = yield* redis.hset("user:42", [
+    //  ^?
+    ["name", "Ada"],
+    ["plan", "pro"],
+  ]);
+  const name = yield* redis.hgetText("user:42", "name");
+  //    ^?
+  const everything = yield* redis.hgetall("user:42");
+  //    ^?
+
+  return { added, name, everything };
+});
+```
+
+`hset` returns the number of new fields as a `bigint`. `hgetall` keeps field order and returns binary pairs, not a JavaScript object.
+
+## Methods
+
+| Method                       | Command        | Reply type                                       | Purpose                                                                         |
+| ---------------------------- | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `redis.hset`                 | `HSET`         | `bigint`                                         | Set one or more fields.                                                         |
+| `redis.hmset`                | `HMSET`        | `void`                                           | Set one or more fields (older form of HSET).                                    |
+| `redis.hsetnx`               | `HSETNX`       | `boolean`                                        | Set a field only if it does not exist.                                          |
+| `redis.hget`                 | `HGET`         | `Option<Uint8Array>`                             | Read a field as bytes.                                                          |
+| `redis.hgetText`             | `HGET`         | `Option<string>`                                 | Read a field as UTF-8 text.                                                     |
+| `redis.hmget`                | `HMGET`        | `readonly Option<Uint8Array>[]`                  | Read several fields in order.                                                   |
+| `redis.hgetall`              | `HGETALL`      | `readonly (readonly [Uint8Array, Uint8Array])[]` | Read every field and value as pairs.                                            |
+| `redis.hkeys`                | `HKEYS`        | `readonly Uint8Array[]`                          | List the field names.                                                           |
+| `redis.hvals`                | `HVALS`        | `readonly Uint8Array[]`                          | List the values.                                                                |
+| `redis.hlen`                 | `HLEN`         | `bigint`                                         | Count the fields.                                                               |
+| `redis.hstrlen`              | `HSTRLEN`      | `bigint`                                         | Return the length of a field value.                                             |
+| `redis.hexists`              | `HEXISTS`      | `boolean`                                        | Check whether a field exists.                                                   |
+| `redis.hdel`                 | `HDEL`         | `bigint`                                         | Delete fields and return how many were removed.                                 |
+| `redis.hincrby`              | `HINCRBY`      | `bigint`                                         | Increment an integer field.                                                     |
+| `redis.hincrbyfloat`         | `HINCRBYFLOAT` | `string`                                         | Increment a field by a decimal amount; the result is the server's decimal text. |
+| `redis.hrandfield`           | `HRANDFIELD`   | `Option<Uint8Array>`                             | Return one random field name.                                                   |
+| `redis.hrandfieldCount`      | `HRANDFIELD`   | `readonly Uint8Array[]`                          | Return several random field names.                                              |
+| `redis.hrandfieldWithValues` | `HRANDFIELD`   | `readonly (readonly [Uint8Array, Uint8Array])[]` | Return several random fields with their values.                                 |
+| `redis.hscan`                | `HSCAN`        | `ScanPage<readonly [Uint8Array, Uint8Array]>`    | Read one cursor page of fields and values.                                      |
+| `redis.hscanFields`          | `HSCAN`        | `ScanPage<Uint8Array>`                           | Read one cursor page of field names only (NOVALUES).                            |
+| `redis.hexpire`              | `HEXPIRE`      | `readonly bigint[]`                              | Set a field expiry in seconds.                                                  |
+| `redis.hpexpire`             | `HPEXPIRE`     | `readonly bigint[]`                              | Set a field expiry in milliseconds.                                             |
+| `redis.hexpireat`            | `HEXPIREAT`    | `readonly bigint[]`                              | Set a field expiry as a Unix time in seconds.                                   |
+| `redis.hpexpireat`           | `HPEXPIREAT`   | `readonly bigint[]`                              | Set a field expiry as a Unix time in milliseconds.                              |
+| `redis.httl`                 | `HTTL`         | `readonly bigint[]`                              | Read field expiries in seconds.                                                 |
+| `redis.hpttl`                | `HPTTL`        | `readonly bigint[]`                              | Read field expiries in milliseconds.                                            |
+| `redis.hexpiretime`          | `HEXPIRETIME`  | `readonly bigint[]`                              | Read field expiries as Unix times in seconds.                                   |
+| `redis.hpexpiretime`         | `HPEXPIRETIME` | `readonly bigint[]`                              | Read field expiries as Unix times in milliseconds.                              |
+| `redis.hpersist`             | `HPERSIST`     | `readonly bigint[]`                              | Remove field expiries.                                                          |
+| `redis.hgetdel`              | `HGETDEL`      | `readonly Option<Uint8Array>[]`                  | Read fields and delete them.                                                    |
+| `redis.hgetex`               | `HGETEX`       | `readonly Option<Uint8Array>[]`                  | Read fields and change their expiry.                                            |
+| `redis.hsetex`               | `HSETEX`       | `boolean`                                        | Set fields with an optional condition and expiry.                               |
+
+## `HashSetExpiryOptions`
+
+`redis.hsetex` takes `HashSetExpiryOptions`. Field expiry methods take a `HashFields` tuple of field names and an optional `HashExpireCondition` of `"NX" | "XX" | "GT" | "LT"`. `redis.hgetex` takes an `Expiry`.
+
+<TypeTable
+  type={{
+    keyCondition: {
+      type: '"NX" | "XX"',
+      description: "Write only if the key is absent or present.",
+      required: false,
+    },
+    condition: {
+      type: '"FNX" | "FXX"',
+      description: "Write only if none (FNX) or all (FXX) of the fields exist.",
+      required: false,
+    },
+    expiry: {
+      type: '{ type: "EX" | "PX" | "EXAT" | "PXAT"; value: number | bigint } | { type: "KEEPTTL" }',
+      description: "Expiry applied to the fields that were set.",
+      required: false,
+    },
+  }}
+/>
+
+## Scan options
+
+`redis.hscan` and `redis.hscanFields` take a cursor string (default `"0"`) and `ScanOptions`: `{ match?: RedisArgument; count?: number | bigint }`. They return a `ScanPage<A>`: `{ cursor: string; entries: ReadonlyArray<A> }`. To walk a whole hash as a stream, use `redis.scanHash` and `redis.scanHashFields`. See [Scanning](/docs/redis/scanning).

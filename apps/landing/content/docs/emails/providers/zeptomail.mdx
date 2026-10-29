@@ -1,0 +1,140 @@
+---
+title: ZeptoMail
+description: "Send email through ZeptoMail with the @effect-kit/emails/zeptomail Layer."
+---
+
+The `@effect-kit/emails/zeptomail` subpath sends messages through [ZeptoMail](https://www.zoho.com/zeptomail/help/) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect zeptomail@8.0.1
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`ZeptoMail.layerConfig()` reads these variables:
+
+| Variable          | Required | Value                                                            |
+| ----------------- | -------- | ---------------------------------------------------------------- |
+| `ZEPTOMAIL_TOKEN` | yes      | Send mail token                                                  |
+| `ZEPTOMAIL_URL`   | yes      | Full API URL, for example `https://api.zeptomail.com/v1.1/email` |
+
+**Example** (Sending a Message With ZeptoMail)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as ZeptoMail from "@effect-kit/emails/zeptomail";
+
+const EmailLive = ZeptoMail.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your ZeptoMail account is allowed to send from.
+
+## Options
+
+`ZeptoMail.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    token: {
+      type: "Redacted<string>",
+      description:
+        "The send mail token, without the `Zoho-enczapikey` prefix. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    url: {
+      type: "URL",
+      description:
+        "The API URL for your Zoho data centre. The path must be exactly /v1.1/email, with http or https and no credentials, query or fragment.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+ZeptoMail reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- `url` has no default because the host depends on the Zoho data centre of your account. Both `layerConfig` and `layer` need it.
+- The package adds the `Zoho-enczapikey ` prefix to the token, so pass only the token.
+- ZeptoMail returns a request id and no message id. The receipt's `references` is empty and `requestId` holds the request id.
+
+## Using your own client
+
+`layerClient` takes any object with `sendMail(message)`, which a `SendMailClient` has. `options` is optional.
+
+**Example** (Borrowing a ZeptoMail Client)
+
+```ts
+import { SendMailClient } from "zeptomail";
+import * as ZeptoMail from "@effect-kit/emails/zeptomail";
+
+const client = new SendMailClient({
+  url: "https://api.zeptomail.com/v1.1/email",
+  token: "Zoho-enczapikey fake-token",
+});
+
+const EmailLive = ZeptoMail.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. A borrowed client carries its own token, so include the prefix there if the SDK needs it.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "zeptomail"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------- |
+| `timeout` | The timeout is not finite and positive.                                                                 |
+| `token`   | The token is not printable ASCII without spaces.                                                        |
+| `url`     | The URL is not http or https, has credentials, a query or a fragment, or its path is not `/v1.1/email`. |
+
+| ZeptoMail failure                                  | Reason                                               |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| SDK network error                                  | `TransportError`                                     |
+| SDK timeout error                                  | `TimeoutError`                                       |
+| SDK authentication error                           | `AuthenticationError` (`acceptance: "rejected"`)     |
+| SDK validation error, or a local validation string | `InvalidMessageError` (`acceptance: "notSubmitted"`) |
+| Error code `TM_3004`                               | `InvalidMessageError` (`acceptance: "rejected"`)     |
+| Any other error code in the response               | `ProviderError` (`acceptance: "rejected"`)           |
+
+An API error from the SDK uses its HTTP status with the shared mapping. A response that is not valid JSON fails with `UnexpectedResponseError`. Kept `providerCode` values are `TM_3004` and `AUTHENTICATION_ERROR`.

@@ -1,0 +1,154 @@
+---
+title: Amazon SES
+description: "Send email through Amazon SES with the @effect-kit/emails/ses Layer."
+---
+
+The `@effect-kit/emails/ses` subpath sends messages through [Amazon SES](https://docs.aws.amazon.com/ses/) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @aws-sdk/client-sesv2@3.1157.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Ses.layerConfig()` reads these variables:
+
+| Variable     | Required | Value                          |
+| ------------ | -------- | ------------------------------ |
+| `AWS_REGION` | yes      | AWS region such as `eu-west-1` |
+
+Credentials are not read by `layerConfig`. They come from the AWS SDK default credential chain.
+
+**Example** (Sending a Message With Amazon SES)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Ses from "@effect-kit/emails/ses";
+
+const EmailLive = Ses.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Amazon SES account is allowed to send from.
+
+## Options
+
+`Ses.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    region: {
+      type: "string",
+      description: "AWS region. Lowercase letters, digits and hyphens only.",
+      required: true,
+    },
+    credentials: {
+      type: "{ accessKeyId, secretAccessKey: Redacted<string>, sessionToken?: Redacted<string> } | (() => Promise<AwsCredentials>)",
+      description:
+        "Static credentials or a provider function. When omitted the AWS SDK default credential chain is used.",
+      required: false,
+    },
+    endpoint: {
+      type: "URL",
+      description: "Custom endpoint. Must be http or https with no credentials, query or fragment.",
+      required: false,
+    },
+    configurationSetName: {
+      type: "string",
+      description:
+        "SES configuration set applied to every send. 1 to 64 letters, digits, underscores or hyphens.",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Amazon SES reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- `layerConfig` reads only `AWS_REGION`. Credentials resolve through the AWS SDK default chain (environment, shared files, instance or task roles). To pass keys yourself, use `layer` with `credentials`.
+- The owned client is built with `maxAttempts: 1`, so the AWS SDK never retries a send. The Layer destroys it when its scope closes.
+- Messages go out as SES v2 `Simple` content. Attachments with a `contentId` are sent with `ContentDisposition: INLINE`.
+- The receipt's reference is the SES `MessageId`, and `requestId` comes from the SDK response metadata.
+
+## Using your own client
+
+`layerClient` takes any object with `send(command, { abortSignal })`, which an `SESv2Client` has. `options` is optional and accepts `timeout` and `configurationSetName`.
+
+**Example** (Borrowing a Amazon SES Client)
+
+```ts
+import { SESv2Client } from "@aws-sdk/client-sesv2";
+import * as Ses from "@effect-kit/emails/ses";
+
+const client = new SESv2Client({ region: "eu-west-1", maxAttempts: 1 });
+
+const EmailLive = Ses.layerClient(client, { configurationSetName: "transactional" });
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. Set `maxAttempts: 1` on a client you own if you want the same no-retry behavior as the owned client.
+
+## Errors
+
+Layer construction fails with `SesConfigurationError`, whose `field` names the bad option. `layerClient` fails with it for the client options.
+
+| `field`                | Raised when                                                              |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `region`               | The region is not lowercase letters, digits and hyphens.                 |
+| `timeout`              | The timeout is not finite and positive.                                  |
+| `endpoint`             | The URL is not http or https, or has credentials, a query or a fragment. |
+| `configurationSetName` | The name does not match `[A-Za-z0-9_-]{1,64}`.                           |
+
+| SES error                                                                                                               | Reason                  |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `TimeoutError`                                                                                                          | `TimeoutError`          |
+| `AbortError`, `ECONNRESET`, `ECONNREFUSED`, `EPIPE`, `ENOTFOUND`, `EAI_AGAIN`                                           | `TransportError`        |
+| `CredentialsProviderError`, `TokenProviderError`, `InvalidClientTokenId`, `ExpiredToken`, `UnrecognizedClientException` | `AuthenticationError`   |
+| `TooManyRequestsException`                                                                                              | `RateLimitedError`      |
+| `LimitExceededException`                                                                                                | `QuotaExceededError`    |
+| `MessageRejected`                                                                                                       | `MessageRejectedError`  |
+| `BadRequestException`                                                                                                   | `InvalidMessageError`   |
+| `MailFromDomainNotVerifiedException`, `SendingPausedException`, `AccountSuspendedException`, `AccessDeniedException`    | `PermissionDeniedError` |
+
+The SES error name is kept as `providerCode`. `CredentialsProviderError` and `TokenProviderError` are `acceptance: "notSubmitted"` because no request was made. For other errors `acceptance` follows the HTTP status: `rejected` for a 4xx other than 409, `unknown` otherwise.
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors).

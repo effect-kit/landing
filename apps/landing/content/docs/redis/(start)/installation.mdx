@@ -1,0 +1,39 @@
+---
+title: Installation
+description: Install the package and pick the entry point for your runtime.
+---
+
+`@effect-kit/redis` needs Effect 4 and an ES module project.
+
+- Node.js `>=24.22.0`. The tested native runtimes are Node.js 24.22.0 and Bun 1.4.4.
+- `effect@^4.0.6`, the only peer dependency.
+- ESM only. The package has no CommonJS build.
+
+```package-install
+@effect-kit/redis effect
+```
+
+## Entry points
+
+The package has four entry points. The root is runtime neutral and has no transport, so you also import one runtime entry point and provide its layer.
+
+| Import                      | Exports                                                                                 | Use it for                                               |
+| --------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `@effect-kit/redis`         | `Redis`, `RedisSessions`, `RedisPubSub`, `RedisStreams`, `Commands`, `RedisKey`, errors | Services, commands and types in every program            |
+| `@effect-kit/redis/node`    | `RedisNode`                                                                             | TCP, TLS and Unix sockets on Node.js                     |
+| `@effect-kit/redis/bun`     | `RedisBun`                                                                              | TCP, TLS and Unix sockets on Bun                         |
+| `@effect-kit/redis/upstash` | `RedisUpstash`                                                                          | Upstash over HTTP, including Deno and Cloudflare Workers |
+
+**Example** (Importing the Service and One Runtime Layer)
+
+```ts
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+```
+
+<Callout type="warn" title="Two exports named layer">
+  `@effect-kit/redis/node` and `@effect-kit/redis/bun` also export a bare `layer`. That one is the
+  socket transport, not a client. Use `RedisNode.layer` or `RedisBun.layer`.
+</Callout>
+
+There is no runtime detection. You import the entry point that matches where the code runs.

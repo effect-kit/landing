@@ -1,0 +1,60 @@
+---
+title: Receipts
+description: The SendReceipt returned by a successful send, with its references and per-recipient outcomes.
+---
+
+A `SendReceipt` is the provider's acknowledgment that it accepted the submission. It does not say the message reached an inbox.
+
+## `SendReceipt`
+
+| Field        | Type                                | Description                                                 |
+| ------------ | ----------------------------------- | ----------------------------------------------------------- |
+| `provider`   | `ProviderName`                      | The provider name. Must match the service that returned it. |
+| `status`     | `"accepted" \| "partiallyAccepted"` | Whether every recipient was accepted.                       |
+| `references` | `SubmissionReference[]`             | Provider identifiers for the submission.                    |
+| `requestId`  | `string` (optional)                 | The provider's request id, when it returns one.             |
+| `recipients` | `RecipientOutcome[]` (optional)     | Per-recipient outcomes. Non-empty when present.             |
+
+When `recipients` is present, each `role` and `index` pair appears once. A `partiallyAccepted` receipt has at least one accepted and one rejected recipient. An `accepted` receipt has none rejected.
+
+## `SubmissionReference`
+
+| Field   | Type                                                      | Description                                              |
+| ------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| `kind`  | `"providerMessageId" \| "smtpMessageId" \| "operationId"` | What the value identifies.                               |
+| `value` | `string`                                                  | Not blank, no control characters, up to 1024 characters. |
+
+`operationId` is what Azure returns, for its long-running send operation.
+
+## `RecipientOutcome`
+
+| Field           | Type                                    | Description                                |
+| --------------- | --------------------------------------- | ------------------------------------------ |
+| `role`          | `"to" \| "cc" \| "bcc"`                 | The recipient list.                        |
+| `index`         | `number`                                | Position in that list, from 0.             |
+| `status`        | `"accepted" \| "rejected" \| "unknown"` | The provider's verdict for this recipient. |
+| `references`    | `SubmissionReference[]` (optional)      | Identifiers for this recipient.            |
+| `rejectionCode` | `string` (optional)                     | Only when `status` is `"rejected"`.        |
+
+## `RecipientPosition`
+
+`{ role, index }`, the shape used in `RecipientRejectedError.recipients` and as the base of `RecipientOutcome`.
+
+## `ProviderName`
+
+A string of 1 to 128 characters. It starts with a letter, digit or `@`, then uses letters, digits and `@ . _ / -`. It identifies the provider in `SendReceipt.provider`, `EmailError.provider` and the `email.provider` span attribute.
+
+| Value                                                                                                                                                                               | Provider                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `resend`, `nodemailer`, `ses`, `azure`, `postmark`, `sendgrid`, `mailgun`, `mailersend`, `brevo`, `mailtrap`, `scaleway`, `eusend`, `zeptomail`, `mailchimp-transactional`, `plunk` | The provider of the same name.                   |
+| `lettermint`, `lettermint/sandbox`                                                                                                                                                  | Lettermint, and Lettermint with `sandbox: true`. |
+
+`EmailTest` uses `test` unless you set `provider`.
+
+## `ProviderCode`
+
+A string of 1 to 128 characters from letters, digits and `_ . : -`. It is the type of `EmailError.providerCode` and of `RecipientOutcome.rejectionCode`.
+
+## Receipt checks
+
+`email.send` validates every receipt before returning it. It fails with `UnexpectedResponseError` and `acceptance: "unknown"` when the receipt does not decode, names a different provider than the service, or lists a recipient `index` that does not exist.

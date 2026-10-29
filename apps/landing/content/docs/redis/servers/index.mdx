@@ -1,0 +1,47 @@
+---
+title: Compatibility
+description: See which Redis-compatible servers and versions the package is tested against.
+keywords: [Redis, Valkey, Dragonfly, KeyDB, Redict, Garnet, Kvrocks, versions]
+---
+
+The client speaks RESP, so it connects to any server that does. What the package tests is listed below. A server not in the table may work, but nothing in the package checks it.
+
+## Tested servers
+
+| Server                         | How you connect                                              | Tested versions                       |
+| ------------------------------ | ------------------------------------------------------------ | ------------------------------------- |
+| Redis                          | `RedisNode` or `RedisBun`, including Cluster and Sentinel    | `6.2.19`, `7.2.11`, `7.4.6`, `8.10.2` |
+| Valkey                         | `RedisNode` or `RedisBun`, including Cluster and Sentinel    | `7.2.11`, `8.0.3`, `9.1.2`            |
+| Dragonfly                      | `RedisNode` or `RedisBun`, a subset of commands              | `v2.0.2`                              |
+| KeyDB                          | `RedisNode` or `RedisBun`, a subset of commands              | `v6.3.4`                              |
+| Redict                         | `RedisNode` or `RedisBun`, a subset of commands              | `7.3.6`                               |
+| Garnet                         | `RedisNode` or `RedisBun`, a subset of commands              | `v2.2.4`                              |
+| Apache Kvrocks                 | `RedisNode` or `RedisBun`, a subset of commands              | `v2.17.0`                             |
+| Upstash                        | `RedisUpstash` over HTTP, or a native `rediss://` connection | Hosted instances                      |
+| Aiven Valkey, Redis Cloud Free | `RedisNode` or `RedisBun`                                    | Hosted instances                      |
+| Deno, Cloudflare Workers       | `RedisUpstash`                                               | Not applicable                        |
+
+The versions come from the package's test fixtures. The command tests run on every listed Redis and Valkey version. The five other engines run once, on the version shown. Each engine is exercised over RESP2 and RESP3, on Node.js and on Bun.
+
+See [Engines](/docs/redis/servers/engines) for the engine profiles, [Managed providers](/docs/redis/servers/providers) for cloud services, and [Modules](/docs/redis/servers/modules) for JSON, Search and the rest.
+
+## What compatible means
+
+Commands and their guarantees depend on the server version, its configuration and the modules it has loaded. The client does not detect the server version. It sends the command, and an older or different server answers with a `ServerError`.
+
+Some commands exist on only one product:
+
+- `HEXPIRE` and the other hash field expiry commands arrive in Redis `7.4.0` and Valkey `9.0.0`.
+- `DELIFEQ` is in Valkey `9.0.0` and not in the Redis baseline the package was written against.
+- `CLUSTERSCAN` is in Valkey `9.1.0` and later.
+
+The typed API includes all of them. Calling one on a server without it fails with `ServerError`.
+
+<Callout type="info" title="Profiles do not certify">
+  A deployment profile applies rules for one engine or provider, such as TLS and restricted
+  commands. It does not certify that provider. Every profile has `certification: "pending"`.
+</Callout>
+
+## Not covered by the command API
+
+Replication and RDB framing, and streamed RESP3 aggregates, are outside the ordinary command API. A Redis Cluster allows only database `0`. Valkey `9.0` and later can be configured for multiple databases in a cluster, which you declare with `databaseCapability: "valkey-multi-db"`.

@@ -1,0 +1,62 @@
+---
+title: Installation
+description: Install the package, one provider SDK at its pinned version, and React only if you render templates.
+---
+
+`@effect-kit/emails` needs Effect and the SDK of the provider you use. Every provider SDK is an optional peer dependency, so install exactly one.
+
+## Requirements
+
+- Node.js `>=24.22.0`.
+- ESM only. The package has no CommonJS build.
+- `effect@^4.0.6`. Snippets written for Effect v3 do not work.
+
+## Install
+
+**Example** (Installing the Package With Resend)
+
+```package-install
+@effect-kit/emails effect resend@6.34.1
+```
+
+Provider SDKs are pinned to exact versions. Install the version in the table below, not a range.
+
+Importing a provider subpath without its SDK fails with `ERR_MODULE_NOT_FOUND`. The root `@effect-kit/emails` and `@effect-kit/emails/testing` need only Effect.
+
+## Provider SDKs
+
+| Subpath                                      | SDK packages (exact version)                              |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `@effect-kit/emails/resend`                  | `resend@6.34.1`                                           |
+| `@effect-kit/emails/ses`                     | `@aws-sdk/client-sesv2@3.1157.0`                          |
+| `@effect-kit/emails/postmark`                | `postmark@5.1.0`                                          |
+| `@effect-kit/emails/sendgrid`                | `@sendgrid/mail@8.1.6`                                    |
+| `@effect-kit/emails/mailgun`                 | `mailgun.js@14.1.0`, `form-data@4.0.5`                    |
+| `@effect-kit/emails/nodemailer`              | `nodemailer@10.2.1`                                       |
+| `@effect-kit/emails/brevo`                   | `@getbrevo/brevo@6.2.0`                                   |
+| `@effect-kit/emails/mailersend`              | `mailersend@3.6.0`                                        |
+| `@effect-kit/emails/mailtrap`                | `mailtrap@5.0.0`                                          |
+| `@effect-kit/emails/mailchimp-transactional` | `@mailchimp/mailchimp_transactional@1.4.1`                |
+| `@effect-kit/emails/azure`                   | `@azure/communication-email@1.1.0`                        |
+| `@effect-kit/emails/zeptomail`               | `zeptomail@8.0.1`                                         |
+| `@effect-kit/emails/scaleway`                | `@scaleway/sdk-tem@2.16.3`, `@scaleway/sdk-client@2.16.0` |
+| `@effect-kit/emails/lettermint`              | `lettermint@3.2.0`                                        |
+| `@effect-kit/emails/plunk`                   | `@plunk/node@3.0.3`                                       |
+| `@effect-kit/emails/eusend`                  | `@eusend_dev/sdk@0.19.0`                                  |
+
+## React peers
+
+Only [React templates](/docs/emails/react-templates) need React.
+
+```package-install
+@react-email/render@2.1.1 react@19.3.1 react-dom@19.3.1
+```
+
+```package-install
+-D @types/react@19.3.0
+```
+
+<Callout type="info" title="Dev dependency">
+  `@types/react` is a type-only peer. The renderer itself needs `@react-email/render`, `react` and
+  `react-dom`.
+</Callout>

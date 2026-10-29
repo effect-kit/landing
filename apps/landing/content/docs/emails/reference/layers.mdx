@@ -1,0 +1,96 @@
+---
+title: Layers and environment variables
+description: The three layer constructors every provider exports, and the environment variables each default layerConfig reads.
+keywords: ["layerConfig", "layerClient", "env vars", "ConfigProvider"]
+---
+
+Every provider subpath exports `layer`, `layerClient` and `layerConfig`. Each returns a `Layer` that provides `Email`.
+
+| Constructor                     | Takes                                         | Client                                                                                                                 |
+| ------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `layer(options)`                | Resolved options, with secrets as `Redacted`. | Creates the SDK client and owns it. The client is closed with the layer's scope, where the SDK has something to close. |
+| `layerClient(client, options?)` | A client you built.                           | Borrowed. The package never closes it, and the client keeps its own retry, timeout and logging policy.                 |
+| `layerConfig(config?)`          | An Effect `Config` of the options.            | As `layer`.                                                                                                            |
+
+`layerConfig` has a default `Config` that reads the environment variables below. Mailtrap has no default, so its `config` argument is required.
+
+**Example** (Reading Environment Variables With the Default Config)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Resend from "@effect-kit/emails/resend";
+
+const EmailLive = Resend.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return email.provider;
+}).pipe(Effect.provide(EmailLive));
+```
+
+Layer errors are typed: `layerConfig` can fail with `Config.ConfigError` for a missing or malformed variable, and every constructor can fail with the provider's configuration error. See [Errors](/docs/emails/reference/errors#configuration-errors).
+
+`Redacted` secrets must be printable ASCII with no whitespace. Every provider accepts a `timeout` option of a finite, positive `Duration`. The default is 30 seconds, and 60 seconds for `azure`.
+
+## Environment variables
+
+These are the variables the default `layerConfig` reads.
+
+| Provider                  | Variables                                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| `resend`                  | `RESEND_API_KEY`                                                                                    |
+| `nodemailer`              | `SMTP_HOST`, `SMTP_PORT` (default 587), `SMTP_SECURE` (default false), `SMTP_USER`, `SMTP_PASSWORD` |
+| `ses`                     | `AWS_REGION`                                                                                        |
+| `azure`                   | `AZURE_EMAIL_CONNECTION_STRING`                                                                     |
+| `postmark`                | `POSTMARK_SERVER_TOKEN`                                                                             |
+| `sendgrid`                | `SENDGRID_API_KEY`                                                                                  |
+| `mailgun`                 | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`us` or `eu`)                                |
+| `mailersend`              | `MAILERSEND_API_KEY`                                                                                |
+| `brevo`                   | `BREVO_API_KEY`                                                                                     |
+| `mailtrap`                | none, pass a `Config`                                                                               |
+| `scaleway`                | `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_PROJECT_ID`, `SCW_REGION` (`fr-par`)                       |
+| `lettermint`              | `LETTERMINT_SENDING_TOKEN`                                                                          |
+| `eusend`                  | `EUSEND_API_KEY`                                                                                    |
+| `zeptomail`               | `ZEPTOMAIL_TOKEN`, `ZEPTOMAIL_URL`                                                                  |
+| `mailchimp-transactional` | `MAILCHIMP_TRANSACTIONAL_API_KEY`                                                                   |
+| `plunk`                   | `PLUNK_API_KEY`                                                                                     |
+
+The default `nodemailer` config requires `SMTP_USER` and `SMTP_PASSWORD`. For an SMTP server without authentication, use `Nodemailer.layer` with a `transport` that has no `auth`.
+
+Options the default config does not read, such as `baseUrl`, `messageStream`, `sandbox` or SES `credentials`, need a custom `Config` or `layer`.
+
+## Options by provider
+
+`timeout` is accepted everywhere and is omitted below.
+
+| Provider                  | `layer` options                                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `resend`                  | `apiKey`, `baseUrl?`                                                                                                                                                     |
+| `nodemailer`              | `transport` (`host`, `port?`, `secure?`, `requireTLS?`, `auth?`, `pool?`, `maxConnections?`, `maxMessages?`, `connectionTimeout?`, `greetingTimeout?`, `socketTimeout?`) |
+| `ses`                     | `region`, `credentials?`, `endpoint?`, `configurationSetName?`                                                                                                           |
+| `azure`                   | `connectionString`, `pollInterval?`                                                                                                                                      |
+| `postmark`                | `serverToken`, `messageStream?`                                                                                                                                          |
+| `sendgrid`                | `apiKey`                                                                                                                                                                 |
+| `mailgun`                 | `apiKey`, `domain`, `region`, `endpoint?`                                                                                                                                |
+| `mailersend`              | `apiKey`                                                                                                                                                                 |
+| `brevo`                   | `apiKey`                                                                                                                                                                 |
+| `mailtrap`                | `token`, `mode`, `inboxId` (a number, required for `sandbox`, not allowed otherwise)                                                                                     |
+| `scaleway`                | `accessKey`, `secretKey`, `projectId`, `region`                                                                                                                          |
+| `lettermint`              | `sendingToken`, `sandbox?`                                                                                                                                               |
+| `eusend`                  | `apiKey`, `baseUrl?`                                                                                                                                                     |
+| `zeptomail`               | `token`, `url`                                                                                                                                                           |
+| `mailchimp-transactional` | `apiKey`, `baseUrl?`                                                                                                                                                     |
+| `plunk`                   | `apiKey`, `baseUrl?`                                                                                                                                                     |
+
+## `layerClient` options
+
+The second argument is optional for every provider except these three, where it holds required fields.
+
+| Provider   | Required options      |
+| ---------- | --------------------- |
+| `mailgun`  | `domain`              |
+| `mailtrap` | `mode`                |
+| `scaleway` | `projectId`, `region` |

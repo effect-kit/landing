@@ -1,0 +1,153 @@
+---
+title: Upstash
+description: Use Redis over HTTPS from Deno, Cloudflare Workers, Bun or Node.js with RedisUpstash.
+keywords: [Upstash, HTTP, REST, SSE, Cloudflare Workers, Deno, serverless]
+---
+
+`RedisUpstash` talks to Upstash over HTTPS using Effect's HTTP client, so it runs where raw sockets are not available, including Deno and Cloudflare Workers. It also runs on Node.js and Bun. Import it from `@effect-kit/redis/upstash`.
+
+**Example** (Creating the Upstash Layer)
+
+```ts twoslash
+import { Config, Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisUpstash } from "@effect-kit/redis/upstash";
+
+const RedisLive = RedisUpstash.layerConfig(
+  Config.all({
+    url: Config.String("UPSTASH_REDIS_REST_URL"),
+    token: Config.Redacted("UPSTASH_REDIS_REST_TOKEN"),
+  }),
+);
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("greeting");
+});
+
+export const runnable = program.pipe(Effect.provide(RedisLive));
+```
+
+## Creating the layer
+
+| Constructor                        | Use                                                         |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `RedisUpstash.layer`               | Settings as an object. Includes Effect's `FetchHttpClient`. |
+| `RedisUpstash.layerConfig`         | Settings from an Effect `Config`.                           |
+| `RedisUpstash.layerWithHttpClient` | Settings as an object. You provide the `HttpClient`.        |
+
+The `url` must be `https:`, with no credentials, query string, hash or path. Authenticate with `token` (a `Redacted` string) or with `credentials` (see [Credentials](/docs/redis/credentials)), not both. A plain-string token is a type error.
+
+<TypeTable
+  type={{
+    allowInsecureLocalhost: {
+      type: "boolean",
+      description: "Allow http:// for localhost, 127.0.0.1 and [::1] only.",
+      default: "false",
+      required: false,
+    },
+    pipelineResponseFormat: {
+      type: '"array" | "frames"',
+      description: "Response shape for pipelines. frames is for development proxies.",
+      default: '"array"',
+      required: false,
+    },
+    requestTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for one request.",
+      default: "30000",
+      required: false,
+    },
+    maxConcurrentRequests: {
+      type: "number",
+      description: "Requests in flight at once. At most 1024.",
+      default: "32",
+      required: false,
+    },
+    maxBatchCommands: {
+      type: "number",
+      description: "Commands in one pipeline or transaction. At most 10000.",
+      default: "256",
+      required: false,
+    },
+    maxRequestBytes: {
+      type: "number",
+      description: "Size of one request body.",
+      default: "8388608",
+      required: false,
+    },
+    maxResponseBytes: {
+      type: "number",
+      description: "Size of one response body.",
+      default: "16777216",
+      required: false,
+    },
+  }}
+/>
+
+## Provided services
+
+The layer provides `Redis`, `BatchExecutor`, `CommandExecutor`, `RedisCredentials` and `UpstashEvents`.
+
+**Example** (The Services an Upstash Layer Provides)
+
+```ts twoslash
+import type { Layer } from "effect";
+import { Redacted } from "effect";
+import { RedisUpstash } from "@effect-kit/redis/upstash";
+
+const RedisLive = RedisUpstash.layer({
+  url: "https://example.upstash.io",
+  token: Redacted.make("token"),
+});
+
+type Provided = Layer.Success<typeof RedisLive>;
+//   ^?
+```
+
+<Callout type="warn" title="No sessions over HTTP">
+  `RedisSessions`, `RedisPubSub`, `RedisStreams`, `RedisScripts` and `RedisAdmin` are not provided.
+  A program that requires one does not type-check against this layer.
+</Callout>
+
+## What works over HTTP
+
+Ordinary commands, pipelines and transactions work. A pipeline or transaction is one request. Pub/Sub is text only, through `UpstashEvents.subscribe`; see [Pub/Sub](/docs/redis/pubsub#pub-sub-on-upstash).
+
+These do not exist over HTTP:
+
+- Sessions, `WATCH` and blocking commands.
+- Client-side caching and tracking.
+- Cluster and Sentinel routing. `CLUSTER`, `SENTINEL`, `CLIENT` and commands with an explicit node or slot target fail with `UpstashError` where `reason` is `"unsupported"` and `delivery` is `"unsent"`.
+
+Binary request positions are limited. Invalid UTF-8 in an argument fails with `UpstashError` and `reason: "encoding"`. A transaction rejects commands whose replies are ambiguous, which means raw commands, custom commands and scripts.
+
+`redis.upstash` holds Upstash's own commands, such as `searchCreate`, `searchQuery`, `vectorCreate`, `vectorQuery` and `aclRestToken`.
+
+## Handling `UpstashError`
+
+`UpstashError` has a `stage` (`config`, `request`, `response` or `stream`), a `reason`, and a `delivery`. Over HTTP, `delivery` is `unsent`, `unknown` or `replied`. It is `unknown`, never `possibly-written`: a request that failed in flight may have run.
+
+A `429` response has `reason: "rate-limit"`. When the response had a `Retry-After` header, `retryAfterSeconds` holds it. A `401` or `403` is `reason: "authentication"`. The package does not retry either. Because the status errors have `delivery: "unknown"`, wait and retry only commands that are safe to run twice.
+
+**Example** (Reading the Retry Hint From a Rate Limit)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+export const read = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("greeting");
+}).pipe(
+  Effect.catchTag("UpstashError", (error) =>
+    error.reason === "rate-limit"
+      ? Effect.logWarning(`rate limited, retry after ${error.retryAfterSeconds ?? "?"} seconds`)
+      : Effect.fail(error),
+  ),
+);
+```
+
+## Tested version
+
+Upstash is tested against hosted instances in isolated tests, over both HTTP and native RESP. To use Upstash over a native socket instead, connect with `RedisNode.layer` and a `rediss://` URL.

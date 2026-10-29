@@ -1,0 +1,185 @@
+---
+title: Streams
+description: Append to Redis Streams, read them as Effect Streams, and process them with consumer groups.
+keywords: [XADD, XREAD, XREADGROUP, XACK, consumer group, at-least-once]
+---
+
+A Redis Stream is an append-only log of entries. `redis.xadd` appends, `RedisStreams` reads and processes. Commands live on `Redis`. The readers and consumers need the `RedisStreams` service, which the Node.js and Bun layers provide.
+
+## Appending entries
+
+An entry is a list of field and value pairs, not an object. Pass `"*"` to let the server pick the id.
+
+**Example** (Appending an Entry)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+export const append = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const id = yield* redis.xadd("orders", "*", [
+    ["id", "o-1001"],
+    ["total", "42"],
+  ]);
+
+  return id;
+  //     ^?
+});
+```
+
+Ids are exact tokens such as `"1700000000000-0"`, never numbers. The result is the id the server assigned.
+
+## Storing typed payloads
+
+`StreamPayload.field` puts one value in one field, encoded with a `PayloadCodec`. `redis.xaddPayload` writes it, and `payload.decode` reads it back.
+
+**Example** (Writing a JSON Payload)
+
+```ts twoslash
+import { Effect, Schema } from "effect";
+import { PayloadCodec, Redis, StreamPayload } from "@effect-kit/redis";
+
+const Order = Schema.Struct({ id: Schema.String, total: Schema.Number });
+
+export const orderPayload = StreamPayload.field("body", PayloadCodec.json(Order));
+
+export const append = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.xaddPayload("orders", "*", orderPayload, { id: "o-1001", total: 42 });
+});
+```
+
+Nothing is encoded as JSON unless you pick `PayloadCodec.json`. Encoding failures are `PayloadError`.
+
+## Reading a stream
+
+`streams.read` is a continuous reader. It returns a `Stream` that blocks for new entries and ends only when you stop it. Each element has the stream name and the entry.
+
+**Example** (Reading New Entries)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { RedisStreams } from "@effect-kit/redis";
+
+export const firstTwo = Effect.gen(function* () {
+  const streams = yield* RedisStreams;
+
+  return yield* streams.read([["orders", "$"]]).pipe(Stream.take(2), Stream.runCollect);
+});
+```
+
+The position `"$"` means new entries only. The reader looks up the latest id once, then advances by id, so entries that arrive between requests are not skipped. Use `"0"` to read from the start.
+
+Each reader holds one blocking connection from the session pool for as long as the stream runs. That pool has `sessions.maxBlockingConnections` connections (default `2`). By default the reader asks for up to `64` entries per request and blocks for `5` seconds. Change both with the second argument: `{ count: 10, block: { blockFor: "forever" } }`.
+
+## Reading with a consumer group
+
+A **consumer group** splits a stream between workers. The server remembers which entries each consumer received and which it acknowledged.
+
+Create the group once. `mkstream` creates the stream if it does not exist, and `"0"` starts the group at the beginning.
+
+**Example** (Creating a Group)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+export const setup = Effect.gen(function* () {
+  const redis = yield* Redis;
+  yield* redis.xgroupCreate("orders", "billing", "0", { mkstream: true });
+});
+```
+
+Then read as a named consumer with `streams.readGroup(group, consumer, keys)`, which returns a `Stream` of `GroupMessage`. An entry that was deleted or trimmed while still pending has `fields: Option.none()`. This is a tombstone.
+
+The recovery helpers return Streams too:
+
+- `streams.pending(key, group, consumer)` yields entries delivered to this consumer and not yet acknowledged.
+- `streams.claim(key, group, consumer, minIdleMillis)` takes over entries that another consumer left idle, one page at a time.
+
+## Processing entries
+
+`streams.consume` does the whole loop. It reads this consumer's pending entries first, then new deliveries. For each entry it runs your handler, and sends `XACK` only after the handler succeeds.
+
+**Example** (Processing Orders With Acknowledgment)
+
+```ts twoslash
+import { Effect, Schema, Stream } from "effect";
+import { PayloadCodec, RedisStreams, StreamPayload } from "@effect-kit/redis";
+
+const Order = Schema.Struct({ id: Schema.String, total: Schema.Number });
+const orderPayload = StreamPayload.field("body", PayloadCodec.json(Order));
+
+export const worker = Effect.gen(function* () {
+  const streams = yield* RedisStreams;
+
+  return yield* streams
+    .consume("billing", "worker-1", ["orders"], (message) =>
+      Effect.gen(function* () {
+        const order = yield* orderPayload.decodeGroup(message.entry);
+        yield* Effect.log(`billing ${order.id}`);
+        return order.total;
+      }),
+    )
+    .pipe(Stream.runDrain);
+});
+```
+
+The stream's elements describe what happened to each entry. `Processed` carries your handler's result. `Handled` and `Pending` come from a failure policy.
+
+| Element     | Meaning                                                                          |
+| ----------- | -------------------------------------------------------------------------------- |
+| `Processed` | The handler succeeded and the entry was acknowledged.                            |
+| `Handled`   | The handler failed and the policy chose `Acknowledge`.                           |
+| `Pending`   | The handler failed and the policy chose `LeavePending`. The error is `Redacted`. |
+
+`streams.process(group, source, handle, options)` runs the same logic over any stream of `GroupMessage`, such as the output of `streams.pending`.
+
+## Handling failures
+
+Without `onFailure`, the first handler failure fails the stream and the entry stays pending. `onFailure` receives the error, the message and the attempt number, and returns a `FailureDecision`:
+
+| `_tag`         | Effect                                                                 |
+| -------------- | ---------------------------------------------------------------------- |
+| `Retry`        | Wait `delay` and run the handler again. Needs `maxAttempts` above `1`. |
+| `LeavePending` | Do not acknowledge. The entry stays in this consumer's pending list.   |
+| `Acknowledge`  | Acknowledge without success, for example after writing a dead letter.  |
+
+`ProcessingOptions` also has `concurrency` (default `1`, at most `256`) and `maxAttempts` (default `1`, at most `100`). When a `Retry` decision comes after attempt `maxAttempts`, the stream fails with the handler's error.
+
+**Example** (Retrying Twice, Then Leaving the Entry Pending)
+
+```ts twoslash
+import { Duration, Effect, Stream } from "effect";
+import { RedisStreams } from "@effect-kit/redis";
+
+export const worker = Effect.gen(function* () {
+  const streams = yield* RedisStreams;
+
+  return yield* streams
+    .consume("billing", "worker-1", ["orders"], () => Effect.fail("charge-failed" as const), {
+      concurrency: 4,
+      maxAttempts: 3,
+      onFailure: (_error, _message, attempt) =>
+        Effect.succeed(
+          attempt < 3
+            ? { _tag: "Retry" as const, delay: Duration.seconds(1) }
+            : { _tag: "LeavePending" as const },
+        ),
+    })
+    .pipe(Stream.runDrain);
+});
+```
+
+A tombstone is reported to `onFailure` as `StreamConsumerError` with `reason: "tombstone"`, and the handler does not run. The other reasons are `acknowledgment-missing`, `invalid-response` and `invalid-policy`. `NOACK` is not available in these helpers.
+
+## Delivery is at least once
+
+An entry is acknowledged after the handler succeeds, never before. If the process stops between the two, or the `XACK` itself fails, the entry is delivered again. The handler of an entry whose `XACK` was lost is not re-run in the same call, and the failure is reported as a `ConnectionError`.
+
+<Callout type="warn" title="Make handlers idempotent">
+  Redelivery is normal after a crash or a failed acknowledgment. Use the entry id, or an id inside
+  the payload, to make the handler safe to run twice.
+</Callout>

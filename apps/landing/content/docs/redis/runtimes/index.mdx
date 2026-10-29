@@ -1,0 +1,44 @@
+---
+title: Overview
+description: Compare what Node.js, Bun and Upstash support, and pick the layer for your runtime.
+---
+
+A **runtime** layer opens the connection and provides the services. You import exactly one from its own entry point. There is no auto-detection.
+
+| Entry point                 | Layer          | Transport                                   |
+| --------------------------- | -------------- | ------------------------------------------- |
+| `@effect-kit/redis/node`    | `RedisNode`    | `node:net`, `node:tls`                      |
+| `@effect-kit/redis/bun`     | `RedisBun`     | `Bun.connect`                               |
+| `@effect-kit/redis/upstash` | `RedisUpstash` | HTTPS and SSE through Effect's `HttpClient` |
+
+## Capability matrix
+
+| Capability                                   | Node.js            | Bun                | Upstash                            |
+| -------------------------------------------- | ------------------ | ------------------ | ---------------------------------- |
+| Ordinary commands                            | Yes                | Yes                | Yes                                |
+| Pipelines and transactions                   | Yes                | Yes                | Yes, one request each              |
+| `RedisSessions`, `WATCH`, blocking commands  | Yes                | Yes                | No                                 |
+| `RedisPubSub` (binary-safe)                  | Yes                | Yes                | No. Text only with `UpstashEvents` |
+| `RedisStreams`, `RedisScripts`, `RedisAdmin` | Yes                | Yes                | No                                 |
+| Client-side caching (tracking)               | Yes                | Yes                | No                                 |
+| Cluster and Sentinel                         | Yes                | Yes                | No                                 |
+| Unix sockets                                 | Yes                | Yes                | No                                 |
+| Binary arguments                             | Yes                | Yes                | Limited                            |
+| Credential providers and `rotate`            | Yes                | Yes                | Yes                                |
+| `delivery` after an uncertain write          | `possibly-written` | `possibly-written` | `unknown`                          |
+
+Client-side caching is available on Node.js and Bun, but it is not part of the layer. You add it yourself.
+
+Deno and Cloudflare Workers support only the Upstash column.
+
+<Cards>
+  <Card title="Node.js" href="/docs/redis/runtimes/node" icon={<Icon name="runtime" />}>
+    TCP, TLS and Unix sockets on Node.js 24.22.0 or later.
+  </Card>
+  <Card title="Bun" href="/docs/redis/runtimes/bun" icon={<Icon name="runtime" />}>
+    The same layers on Bun.connect.
+  </Card>
+  <Card title="Upstash" href="/docs/redis/runtimes/upstash" icon={<Icon name="deploy" />}>
+    Redis over HTTPS for Deno, Workers and serverless.
+  </Card>
+</Cards>

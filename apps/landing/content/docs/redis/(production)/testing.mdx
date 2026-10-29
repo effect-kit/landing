@@ -1,0 +1,87 @@
+---
+title: Testing
+description: Test code that uses Redis with a disposable server or a stub of the Redis service.
+keywords: [testcontainers, mock, stub, vitest, integration test]
+---
+
+The package has no built-in fake and no in-memory Redis. There are two options: run a real disposable server, or replace the `Redis` service with a stub.
+
+## Testing against a disposable server
+
+Run Redis or Valkey in a container and build the layer from its address. The package's own end-to-end tests do this with Testcontainers.
+
+**Example** (A Layer for a Server Started by Your Test Setup)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+// Started by your test setup, for example: docker run --rm -p 6379:6379 redis:7.4
+const RedisTest = RedisNode.layer({ url: "redis://localhost:6379", database: 15 });
+
+export const countVisits = Effect.gen(function* () {
+  const redis = yield* Redis;
+  yield* redis.del(["test:visits"]);
+  yield* redis.incr("test:visits");
+  return yield* redis.incr("test:visits");
+}).pipe(Effect.provide(RedisTest));
+
+// Output: 2n
+```
+
+Use a database number or key prefix that only tests touch, and delete what a test creates. The layer connects when it is built, so a missing server fails the test at setup, before the first command.
+
+The package tests against Redis `6.2.19`, `7.2.11`, `7.4.6` and `8.10.2`, and Valkey `7.2.11`, `8.0.3` and `9.1.2`. Pick the version your production uses.
+
+## Stubbing the service
+
+`Redis` is a plain service, so `Layer.succeed` can replace it. Cast a partial implementation, and make anything you did not stub fail loudly.
+
+**Example** (A Stub That Answers One Command)
+
+```ts twoslash
+import { Effect, Layer, Option } from "effect";
+import { Redis } from "@effect-kit/redis";
+import type { RedisClient } from "@effect-kit/redis";
+
+const RedisStub = Layer.succeed(Redis, {
+  get: (key: string) => Effect.succeed(key === "greeting" ? Option.some("hello") : Option.none()),
+} as unknown as RedisClient);
+
+export const greet = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("greeting");
+}).pipe(Effect.provide(RedisStub));
+```
+
+A stub checks your code's logic, not Redis behavior. It cannot tell you that a key expires, that a pipeline fails halfway, or that a command is rejected by the server.
+
+<Callout type="warn" title="Stubs hide server behavior">
+  Test expiry, ordering, pipelines and transactions against a real server. A stub returns whatever
+  you wrote.
+</Callout>
+
+## Testing timing
+
+`@effect/vitest` provides `it.effect`, which runs with a `TestClock`, and `it.live`, which uses the real clock. Use `it.live` for anything that talks to a real server.
+
+**Example** (A Live Test Against a Server)
+
+```ts
+import { expect, it } from "@effect/vitest";
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisTest = RedisNode.layer({ url: "redis://localhost:6379", database: 15 });
+
+it.live("increments a counter", () =>
+  Effect.gen(function* () {
+    const redis = yield* Redis;
+    yield* redis.del(["test:counter"]);
+
+    expect(yield* redis.incr("test:counter")).toBe(1n);
+  }).pipe(Effect.provide(RedisTest)),
+);
+```

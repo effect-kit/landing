@@ -1,0 +1,93 @@
+---
+title: Managed providers
+description: Apply cloud provider rules with RedisProfiles and restrict where the client may connect.
+keywords: [ElastiCache, MemoryDB, Redis Cloud, Aiven, Memorystore, Azure, DigitalOcean, IAM, Entra]
+---
+
+A provider profile encodes what a managed service requires: TLS, the topology, the identity type and the commands it blocks. The client checks these when the layer is built and when a command is sent, so a mismatch fails before any traffic.
+
+**Example** (Connecting to ElastiCache With IAM)
+
+```ts twoslash
+import type { Effect } from "effect";
+import type { CredentialValues } from "@effect-kit/redis";
+declare const iamToken: Effect.Effect<CredentialValues>;
+// ---cut---
+import { RedisProfiles } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "rediss://my-cache.abc123.use1.cache.amazonaws.com:6379",
+  credentials: iamToken,
+  profile: RedisProfiles.elasticache({
+    engine: "valkey",
+    deployment: "replication-group",
+    routing: "standalone",
+    authentication: "iam",
+  }),
+});
+```
+
+## Provider profiles
+
+Each profile is a function of the options that change its rules. Pass the result as `profile`.
+
+| Profile                                 | Options                                             | Rules it applies                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `RedisProfiles.elasticache`             | `engine`, `deployment`, `routing`, `authentication` | TLS required. Redis engine only: restricts `CONFIG`, `DEBUG`, `SAVE` and other admin commands. Serverless and cluster use database 0. |
+| `RedisProfiles.memorydb`                | `engine`, `authentication`                          | Cluster routing, TLS required, database 0.                                                                                            |
+| `RedisProfiles.redisCloud`              | `plan`, `routing`, `authentication`                 | Database 0. TLS required, except on the `free` plan.                                                                                  |
+| `RedisProfiles.redisSoftware`           | `routing`, `authentication`                         | TLS required, database 0.                                                                                                             |
+| `RedisProfiles.memorystoreRedis`        | `tls`                                               | Standalone. Restricts `ACL`, `CLIENT`, `CLUSTER`, `CONFIG`, `DEBUG` and others.                                                       |
+| `RedisProfiles.memorystoreValkey`       | `routing`, `authentication`, `tls`                  | Restricts `ACL`, `DEBUG`, `CONFIG SET` and others. Database 0 in cluster.                                                             |
+| `RedisProfiles.memorystoreRedisCluster` | `authentication`, `tls`                             | Cluster routing, database 0.                                                                                                          |
+| `RedisProfiles.azureManagedRedis`       | `clustering`, `authentication`                      | TLS required, database 0. `search` unsupported except on `enterprise`.                                                                |
+| `RedisProfiles.aivenValkey`             | `user`                                              | TLS required. The `default` user cannot run `ACL`.                                                                                    |
+| `RedisProfiles.digitalOceanValkey`      | `routing`                                           | TLS required. Restricts `ACL`, `CONFIG`, `MONITOR`, `FAILOVER` and others.                                                            |
+| `RedisProfiles.tair`                    | `edition`, `routing`, `tls`                         | Password authentication.                                                                                                              |
+| `RedisProfiles.upstash`                 | `transport`                                         | TLS required, database 0. `native` uses a proxy and a password, `http` uses a bearer token.                                           |
+
+All of them accept `modules`, like the [engine profiles](/docs/redis/servers/engines). A command on a restricted list fails with `ProfileError` and `reason: "restricted-command"`, with `delivery: "unsent"`.
+
+The profile data was last reviewed on `2026-10-26` (`revision: "reviewed-2026-10-26"`), and every profile has `certification: "pending"`. Provider rules change. Check the provider's own documentation.
+
+## What the layer checks
+
+Building the layer with a profile fails with `ProfileError` when:
+
+| `reason`             | Cause                                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routing`            | The profile's routing does not match the layer, for example a cluster profile with `RedisNode.layer`.                                                               |
+| `tls`                | The profile requires TLS and the endpoint has none, or turns off certificate verification.                                                                          |
+| `database`           | The profile allows only database 0 and `database` is not 0.                                                                                                         |
+| `identity`           | The profile needs a password, IAM or Entra identity and `credentials` is missing. IAM and Entra need an `Effect` or `RedisCredentials.provider`, not a fixed value. |
+| `network-policy`     | IAM or Entra is used with Cluster or Sentinel and no `network` policy is set.                                                                                       |
+| `restricted-command` | The `clientName` you set would use a restricted command.                                                                                                            |
+
+IAM and Entra credentials must carry `expiresAtMillis`. AWS and Entra credentials also need a `username`. Without them, opening a connection fails with `HandshakeError` where `stage` is `"credentials"`.
+
+The AWS IAM profiles set `credentialLifetime` to a `max-age` of 11 hours 55 minutes, and the Entra profile retires connections 180000 ms before the token expires. See [Credentials](/docs/redis/credentials).
+
+## Restricting where the client connects
+
+`network` is an allow-list. It is checked on every dial, including the node addresses a cluster or Sentinel reports, so a topology reply cannot send the client to a host outside the list.
+
+**Example** (Allowing One Host)
+
+```ts twoslash
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "rediss://cache.example.com:6380",
+  network: {
+    allowedHosts: ["cache.example.com"],
+    allowedServerNames: ["cache.example.com"],
+  },
+});
+```
+
+`allowedHosts` is required. `allowedServerNames` also constrains the TLS server name. A violation of the endpoint you configured is `ProfileError` with `reason: "network-policy"`. A discovered address that breaks the policy fails the dial with `TransportError` and `reason: "policy"`.
+
+## Tested providers
+
+The package was tested against hosted Aiven Valkey and Redis Cloud Free instances, and Upstash over native sockets and HTTP. The other profiles come from the providers' documentation. The repository has no live-service tests for them.

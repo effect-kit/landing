@@ -1,0 +1,71 @@
+---
+title: Bun
+description: Connect to Redis from Bun over TCP, TLS or a Unix socket with RedisBun.
+keywords: [Bun.connect, Bun runtime]
+---
+
+`RedisBun` has the same constructors and options as `RedisNode`, but opens its sockets with `Bun.connect`. Import it from `@effect-kit/redis/bun`.
+
+**Example** (Creating the Bun Layer)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisBun } from "@effect-kit/redis/bun";
+
+const RedisLive = RedisBun.layer({ url: "redis://localhost:6379" });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.ping();
+});
+
+export const runnable = program.pipe(Effect.provide(RedisLive));
+```
+
+## Creating the layer
+
+| Constructor                                              | Builds a layer for                            |
+| -------------------------------------------------------- | --------------------------------------------- |
+| `RedisBun.layer`, `RedisBun.layerConfig`                 | One standalone server                         |
+| `RedisBun.layerCluster`, `RedisBun.layerClusterConfig`   | A [cluster](/docs/redis/cluster)              |
+| `RedisBun.layerSentinel`, `RedisBun.layerSentinelConfig` | A [Sentinel](/docs/redis/sentinel) deployment |
+
+<Callout type="warn" title="The layer export is the transport">
+  `layer` exported from `@effect-kit/redis/bun` is the transport, not a client. Build clients with
+  `RedisBun.layer(...)`.
+</Callout>
+
+## Provided services
+
+`RedisBun.layer` provides the same services as `RedisNode.layer`.
+
+**Example** (The Services a Bun Layer Provides)
+
+```ts twoslash
+import type { Layer } from "effect";
+import { RedisBun } from "@effect-kit/redis/bun";
+
+const RedisLive = RedisBun.layer({ url: "redis://localhost:6379" });
+
+type Provided = Layer.Success<typeof RedisLive>;
+//   ^?
+```
+
+## Transport options
+
+The transport uses `Bun.connect` for TCP, TLS and Unix sockets. The `url`, `endpoint` and `tls` shapes are the ones in [Node.js](/docs/redis/runtimes/node#transport-options), including `serverName`, `ca`, `certificate`, `privateKey` and `rejectUnauthorized`.
+
+**Example** (Connecting Over a Unix Socket)
+
+```ts twoslash
+import { RedisBun } from "@effect-kit/redis/bun";
+
+export const RedisLive = RedisBun.layer({ endpoint: { path: "/var/run/redis/redis.sock" } });
+```
+
+Cluster and Sentinel need TCP endpoints, as on Node.js.
+
+## Tested version
+
+The package is tested on Bun `1.4.4`, against Redis and Valkey, including Cluster, Sentinel and a Unix socket. The Unix socket test runs on Linux.

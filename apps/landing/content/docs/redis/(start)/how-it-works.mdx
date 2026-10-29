@@ -1,0 +1,54 @@
+---
+title: How it works
+description: Learn which services the client provides, which layer supplies each one, and what a reply looks like.
+---
+
+The client is a set of Effect services. Each service covers one kind of work, and the runtime layer decides which ones exist in your program.
+
+## Services
+
+| Service                       | What it does                                                                         | Provided by                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `Redis`                       | Ordinary commands, `pipeline`, `transaction`, `execute`, `raw`, scans                | `RedisNode`, `RedisBun`, `RedisUpstash`             |
+| `RedisSessions`               | Leased connections: `withSession`, `withBlockingSession`, `watch`, blocking commands | `RedisNode.layer`, `RedisBun.layer`                 |
+| `RedisPubSub`                 | `subscribe`, `psubscribe`, `ssubscribe`                                              | `RedisNode.layer`, `RedisBun.layer`                 |
+| `RedisStreams`                | Continuous stream readers and consumer groups                                        | `RedisNode.layer`, `RedisBun.layer`                 |
+| `RedisScripts`                | Lua scripts through EVALSHA with automatic load                                      | `RedisNode.layer`, `RedisBun.layer`                 |
+| `RedisTracking`, `RedisCache` | Client-side caching                                                                  | Added by you, see [caching](/docs/redis/caching)    |
+| `RedisCluster`                | Cluster routing and per-node access                                                  | `RedisNode.layerCluster`, `RedisBun.layerCluster`   |
+| `RedisSentinel`               | Primary discovery through Sentinel                                                   | `RedisNode.layerSentinel`, `RedisBun.layerSentinel` |
+
+`Redis` has no blocking commands, no WATCH and no subscriptions. Calling `redis.blpop` is a compile error, and running a blocking command through `redis.execute` fails with an `UnsupportedCommandError`. Those commands live on the other services because they hold a connection.
+
+## Connections and scope
+
+A layer owns its connections. Building the layer opens the socket and runs the handshake, and closing the scope closes everything. Build it once and share it across your program.
+
+One connection writes commands in order and matches replies to them in order. A command that has been written and then interrupted retires its connection, because the reply slot is no longer known. Cancelling a command does not undo it on the server.
+
+Leased connections are separate. `withSession` borrows one from a pool and returns it when the body ends, including on interruption. See [sessions](/docs/redis/sessions).
+
+## Replies
+
+Replies are decoded into plain types.
+
+| Command                                               | Success type                                                                        |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `redis.get`                                           | `Option<string>`, strict UTF-8                                                      |
+| `redis.getBytes`                                      | `Option<Uint8Array>`                                                                |
+| `redis.incr`, `redis.hset`, `redis.zadd`, `redis.del` | `bigint`                                                                            |
+| `redis.hget`, `redis.lrange`                          | `Option<Uint8Array>` and `Uint8Array[]`, with `hgetText` returning `Option<string>` |
+| `redis.set`                                           | `void`, or `boolean` with a `condition`                                             |
+
+## The delivery field
+
+Errors from a command carry `delivery`, which says how far the command got.
+
+| Value              | Meaning                                                |
+| ------------------ | ------------------------------------------------------ |
+| `unsent`           | Nothing was written. Safe to send again.               |
+| `possibly-written` | The write may have reached the server.                 |
+| `replied`          | The server answered, for example with a `ServerError`. |
+| `unknown`          | Over HTTP, the request may or may not have run.        |
+
+The client never replays a command after `possibly-written` or `unknown`. See [errors and retries](/docs/redis/errors).

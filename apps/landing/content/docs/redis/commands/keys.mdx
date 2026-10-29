@@ -1,0 +1,126 @@
+---
+title: Keys and expiry
+description: Look up the generic key commands, expiry commands and key scanning with their reply types.
+---
+
+Key commands work on any key regardless of its type: deleting, renaming, copying, sorting and setting expiry.
+
+**Example** (Expiring and Inspecting a Key)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.set("cache:report", "payload");
+
+  const scheduled = yield* redis.expire("cache:report", 60);
+  //    ^?
+  const remaining = yield* redis.ttl("cache:report");
+  //    ^?
+  const removed = yield* redis.del(["cache:report"]);
+  //    ^?
+
+  return { scheduled, remaining, removed };
+});
+```
+
+`ttl` returns `-2n` for a missing key and `-1n` for a key with no expiry. Other values are the remaining time in the method's unit.
+
+## Methods
+
+| Method                 | Command           | Reply type                      | Purpose                                               |
+| ---------------------- | ----------------- | ------------------------------- | ----------------------------------------------------- |
+| `redis.del`            | `DEL`             | `bigint`                        | Delete keys and return how many existed.              |
+| `redis.unlink`         | `UNLINK`          | `bigint`                        | Delete keys and free their memory in the background.  |
+| `redis.exists`         | `EXISTS`          | `bigint`                        | Count how many of the given keys exist.               |
+| `redis.touch`          | `TOUCH`           | `bigint`                        | Update the last access time of keys.                  |
+| `redis.type`           | `TYPE`            | `string`                        | Return the type name of a key.                        |
+| `redis.rename`         | `RENAME`          | `void`                          | Rename a key.                                         |
+| `redis.renamenx`       | `RENAMENX`        | `boolean`                       | Rename a key only if the new name is free.            |
+| `redis.copy`           | `COPY`            | `boolean`                       | Copy a key, optionally to another database.           |
+| `redis.move`           | `MOVE`            | `boolean`                       | Move a key to another database.                       |
+| `redis.dump`           | `DUMP`            | `Option<Uint8Array>`            | Serialize a key.                                      |
+| `redis.restore`        | `RESTORE`         | `void`                          | Create a key from a serialized value.                 |
+| `redis.randomkey`      | `RANDOMKEY`       | `Option<Uint8Array>`            | Return a random key.                                  |
+| `redis.keys`           | `KEYS`            | `readonly Uint8Array[]`         | List keys matching a pattern in one command.          |
+| `redis.scan`           | `SCAN`            | `ScanPage<Uint8Array>`          | Read one cursor page of keys.                         |
+| `redis.sort`           | `SORT`            | `readonly Option<Uint8Array>[]` | Sort a list, set or sorted set.                       |
+| `redis.sortRo`         | `SORT_RO`         | `readonly Option<Uint8Array>[]` | Sort without writing, so it can run against replicas. |
+| `redis.sortStore`      | `SORT`            | `bigint`                        | Sort and store the result in a key.                   |
+| `redis.expire`         | `EXPIRE`          | `boolean`                       | Set an expiry in seconds.                             |
+| `redis.pexpire`        | `PEXPIRE`         | `boolean`                       | Set an expiry in milliseconds.                        |
+| `redis.expireat`       | `EXPIREAT`        | `boolean`                       | Set an expiry as a Unix time in seconds.              |
+| `redis.pexpireat`      | `PEXPIREAT`       | `boolean`                       | Set an expiry as a Unix time in milliseconds.         |
+| `redis.ttl`            | `TTL`             | `bigint`                        | Read the remaining time to live in seconds.           |
+| `redis.pttl`           | `PTTL`            | `bigint`                        | Read the remaining time to live in milliseconds.      |
+| `redis.expiretime`     | `EXPIRETIME`      | `bigint`                        | Read the expiry as a Unix time in seconds.            |
+| `redis.pexpiretime`    | `PEXPIRETIME`     | `bigint`                        | Read the expiry as a Unix time in milliseconds.       |
+| `redis.persist`        | `PERSIST`         | `boolean`                       | Remove an expiry.                                     |
+| `redis.objectEncoding` | `OBJECT ENCODING` | `Option<Uint8Array>`            | Return the internal encoding of a key.                |
+| `redis.objectFreq`     | `OBJECT FREQ`     | `Option<bigint>`                | Return the access frequency of a key.                 |
+| `redis.objectIdletime` | `OBJECT IDLETIME` | `Option<bigint>`                | Return the seconds since a key was last accessed.     |
+| `redis.objectRefcount` | `OBJECT REFCOUNT` | `Option<bigint>`                | Return the reference count of a key.                  |
+| `redis.objectHelp`     | `OBJECT HELP`     | `readonly string[]`             | Return the OBJECT help text.                          |
+
+## Option types
+
+`KeyExpireCondition` for `expire`, `pexpire`, `expireat` and `pexpireat` is `"NX" | "XX" | "GT" | "LT"`.
+
+<TypeTable
+  type={{
+    database: { type: "number | bigint", description: "Copy into this database.", required: false },
+    replace: {
+      type: "boolean",
+      description: "Overwrite the destination if it exists.",
+      required: false,
+    },
+  }}
+/>
+
+That table is `CopyOptions`, used by `copy`. `SortOptions` is used by `sort`, `sortRo` and `sortStore`.
+
+<TypeTable
+  type={{
+    by: {
+      type: "string | Uint8Array",
+      description: "Pattern of external keys to sort by.",
+      required: false,
+    },
+    get: {
+      type: "[string | Uint8Array, ...(string | Uint8Array)[]]",
+      description: "Patterns of external keys to return.",
+      required: false,
+    },
+    order: { type: '"ASC" | "DESC"', description: "Sort direction.", required: false },
+    alpha: { type: "boolean", description: "Sort lexicographically.", required: false },
+    limit: {
+      type: "{ offset: number | bigint; count: number | bigint }",
+      description: "Return a slice of the result.",
+      required: false,
+    },
+  }}
+/>
+
+`RestoreOptions` for `restore` is `{ replace?: boolean; absolute?: boolean; idleTime?: number | bigint; frequency?: number }`.
+
+## Scanning keys
+
+`redis.scan` reads one page. `redis.scanKeys` streams every key. Both take `KeyScanOptions`, which is `ScanOptions` plus `type`.
+
+<TypeTable
+  type={{
+    match: { type: "RedisArgument", description: "Glob pattern for key names.", required: false },
+    count: {
+      type: "number | bigint",
+      description: "Hint for how many keys the server examines per page.",
+      required: false,
+    },
+    type: { type: "RedisArgument", description: "Only return keys of this type.", required: false },
+  }}
+/>
+
+`redis.keys` runs `KEYS` as one command against the whole keyspace. It is not a cursor and not a cluster helper. See [Scanning](/docs/redis/scanning) for the stream form and [Cluster scanning](/docs/redis/cluster/scanning).

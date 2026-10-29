@@ -1,0 +1,112 @@
+---
+title: Transactions
+description: Run commands as one MULTI and EXEC block, with optional WATCH for optimistic locking.
+keywords: [MULTI, EXEC, WATCH, optimistic locking, TransactionOutcome]
+---
+
+A **transaction** queues commands with MULTI and runs them together with EXEC. No other client's command runs between them. `redis.transaction` takes `Commands.*` values and returns a `TransactionOutcome`.
+
+**Example** (Reading and Incrementing in One Transaction)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const queued = [Commands.get("{account:42}:name"), Commands.incr("{account:42}:visits")] as const;
+
+  const outcome = yield* redis.transaction(queued);
+  //    ^?
+
+  if (outcome._tag === "Conflict") return "conflict";
+
+  return outcome.results;
+});
+```
+
+`TransactionOutcome` is `{ _tag: "Committed", results }` or `{ _tag: "Conflict" }`. `results` has one `Result` per command, typed like a [pipeline](/docs/redis/pipelines). `Conflict` means a watched key changed, so Redis dropped the block. It is a success value, not an error.
+
+<Callout type="warn" title="No rollback">
+  If one command fails at run time, the others stay applied. EXEC does not undo them. Only the
+  queueing step is all or nothing: a rejected command at queue time fails the transaction with
+  `reason: "queue-rejected"`.
+</Callout>
+
+## Pipeline or transaction
+
+|                               | `redis.pipeline`   | `redis.transaction`          |
+| ----------------------------- | ------------------ | ---------------------------- |
+| Round trips                   | One                | One                          |
+| Other clients can interleave  | Yes                | No                           |
+| Result per command            | `Result`           | `Result`, inside `Committed` |
+| WATCH conflict                | Not applicable     | `Conflict`                   |
+| Run-time error in one command | Others still apply | Others still apply           |
+
+## Handling transaction errors
+
+A transaction that cannot run fails with a `TransactionError`. Its `reason` is `"queue-rejected"` or `"exec-rejected"`, and `execution` is `"not-executed"` or `"unknown"`. Failures of the batch itself, such as a lost connection, arrive as `BatchError` with per-command evidence.
+
+**Example** (Telling a Rejected Transaction From a Lost One)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  return yield* redis
+    .transaction([Commands.incr("orders:count")])
+    .pipe(
+      Effect.catchTag("TransactionError", (error) =>
+        Effect.succeed(
+          error.execution === "not-executed" ? "safe to retry" : "check the key first",
+        ),
+      ),
+    );
+});
+```
+
+`"not-executed"` means the block never ran. `"unknown"` means it may have.
+
+## Optimistic locking with WATCH
+
+WATCH marks keys before the transaction. If another client changes one before EXEC, the outcome is `Conflict`. WATCH belongs to a connection, so it lives on `RedisSessions`: `sessions.watch(keys, body)` leases a session, watches the keys, runs `body` and cleans up, even on early return or interruption. `keys` must have at least one key.
+
+**Example** (Retrying a Read-Modify-Write on Conflict)
+
+```ts twoslash
+import { Effect, Option } from "effect";
+
+import { Commands, RedisSessions } from "@effect-kit/redis";
+
+const key = "{account:42}:balance";
+
+const deposit = (amount: number) =>
+  Effect.gen(function* () {
+    const sessions = yield* RedisSessions;
+
+    const attempt = sessions.watch([key], (session) =>
+      Effect.gen(function* () {
+        const current = yield* session.get(key);
+        const next = Number(Option.getOrElse(current, () => "0")) + amount;
+
+        return yield* session.transaction([Commands.set(key, String(next))]);
+      }),
+    );
+
+    // Another client changed the key between WATCH and EXEC: try again
+    let outcome = yield* attempt;
+    while (outcome._tag === "Conflict") outcome = yield* attempt;
+
+    return outcome;
+  });
+```
+
+Inside the body, `session` runs commands on the leased connection, so reads are under the watch. A session can also call `session.watch(keys)` and `session.unwatch()` by hand.
+
+WATCH is not available on Upstash, which has no sessions. Transactions themselves work over HTTP, but commands with ambiguous replies (raw, custom or script commands) are rejected with an `UpstashError` whose `reason` is `"encoding"`.

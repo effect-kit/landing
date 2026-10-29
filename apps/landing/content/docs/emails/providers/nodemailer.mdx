@@ -1,0 +1,193 @@
+---
+title: SMTP (Nodemailer)
+description: "Send email through Nodemailer with the @effect-kit/emails/nodemailer Layer."
+---
+
+The `@effect-kit/emails/nodemailer` subpath sends messages over SMTP with [Nodemailer](https://nodemailer.com) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect nodemailer@10.2.1
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Nodemailer.layerConfig()` reads these variables:
+
+| Variable        | Required | Value                                       |
+| --------------- | -------- | ------------------------------------------- |
+| `SMTP_HOST`     | yes      | SMTP server host                            |
+| `SMTP_PORT`     | no       | Port. Defaults to `587`                     |
+| `SMTP_SECURE`   | no       | Use TLS from the start. Defaults to `false` |
+| `SMTP_USER`     | yes      | Username                                    |
+| `SMTP_PASSWORD` | yes      | Password                                    |
+
+The default Config requires `SMTP_USER` and `SMTP_PASSWORD`. For a server without authentication, pass your own Config or use `layer` with a `transport` that has no `auth`.
+
+**Example** (Sending a Message With Nodemailer)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Nodemailer from "@effect-kit/emails/nodemailer";
+
+const EmailLive = Nodemailer.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Nodemailer account is allowed to send from.
+
+## Options
+
+`Nodemailer.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    "transport.host": {
+      type: "string",
+      description: "SMTP host. Letters, digits, dots, colons, underscores and hyphens only.",
+      required: true,
+    },
+    "transport.port": {
+      type: "number",
+      description: "Integer from 1 to 65535. `layerConfig` defaults it to 587.",
+      required: false,
+    },
+    "transport.secure": {
+      type: "boolean",
+      description: "Use TLS from the start of the connection. `layerConfig` defaults it to false.",
+      required: false,
+    },
+    "transport.requireTLS": {
+      type: "boolean",
+      description: "Fail when the server cannot upgrade to TLS.",
+      required: false,
+    },
+    "transport.auth": {
+      type: "{ user: string; pass: Redacted<string> }",
+      description: "Credentials. Both must be non-empty.",
+      required: false,
+    },
+    "transport.pool": {
+      type: "boolean",
+      description: "Use a pooled connection.",
+      required: false,
+    },
+    "transport.maxConnections": {
+      type: "number",
+      description: "Positive integer. Pool size.",
+      required: false,
+    },
+    "transport.maxMessages": {
+      type: "number",
+      description: "Positive integer. Messages per pooled connection.",
+      required: false,
+    },
+    "transport.connectionTimeout": {
+      type: "Duration",
+      description: "Time allowed to connect.",
+      default: "10 seconds",
+      required: false,
+    },
+    "transport.greetingTimeout": {
+      type: "Duration",
+      description: "Time allowed for the server greeting.",
+      default: "10 seconds",
+      required: false,
+    },
+    "transport.socketTimeout": {
+      type: "Duration",
+      description: "Socket inactivity timeout.",
+      default: "30 seconds",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Nodemailer reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- The owned transport disables file and URL access, turns Nodemailer logging off and sets `maxRequeues: 0`, so Nodemailer never requeues a message. Closing the Layer's scope closes the transport and waits for in-flight sends.
+- SMTP accepts or rejects each recipient. When some recipients are rejected, the receipt has `status: "partiallyAccepted"` with one outcome per recipient, and rejected ones carry `rejectionCode` `SMTP_<code>`. When every recipient is rejected, the send fails with `RecipientRejectedError`.
+- The receipt's reference has kind `smtpMessageId`, taken from the server's message id.
+
+## Using your own client
+
+`layerClient` takes any object with `sendMail(message)`, which a Nodemailer transporter has. `options` is optional. If the transporter exposes `options` and `pool` is true, `maxRequeues` must be `0`, otherwise Layer construction fails with `field: "retries"`.
+
+**Example** (Borrowing a Nodemailer Client)
+
+```ts
+import { createTransport } from "nodemailer";
+import * as Nodemailer from "@effect-kit/emails/nodemailer";
+
+const transporter = createTransport({
+  host: "smtp.example.com",
+  port: 587,
+  maxRequeues: 0,
+});
+
+const EmailLive = Nodemailer.layerClient(transporter);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+Layer construction fails with `NodemailerConfigurationError`, whose `field` names the bad option. `layerClient` fails with it for the client options.
+
+| `field`     | Raised when                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transport` | The transport options are invalid, for example a bad host, port, a non-positive pool size or duration, an empty `auth` value, or an unknown property. |
+| `timeout`   | The timeout is not finite and positive.                                                                                                               |
+| `retries`   | A borrowed pooled transporter has `maxRequeues` other than `0`, or its `options` are not readable.                                                    |
+
+| Nodemailer failure                                          | Reason                                                   |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| SMTP response code below 500                                | `ProviderUnavailableError`                               |
+| `EAUTH`, `ENOAUTH`, `EOAUTH2`, or an `AUTH` command failure | `AuthenticationError`                                    |
+| `RCPT TO` failure with an SMTP response                     | `RecipientRejectedError` listing the rejected recipients |
+| Any other SMTP 5xx response                                 | `MessageRejectedError`                                   |
+| `ETIMEDOUT`                                                 | `TimeoutError`                                           |
+| `ESOCKET`, `ECONNECTION`, `EDNS`, `ETLS`, `EPROTOCOL`       | `TransportError`                                         |
+| Any other known code                                        | `ProviderError`                                          |
+
+The Nodemailer error code is kept as `providerCode` and the SMTP response code as `statusCode`. Failures before submission (connection, DNS, TLS, greeting, authentication) are `acceptance: "notSubmitted"`. An SMTP response code makes it `rejected`. Anything else is `unknown`.

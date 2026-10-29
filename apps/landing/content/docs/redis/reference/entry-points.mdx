@@ -1,0 +1,169 @@
+---
+title: Entry points
+description: Look up every export of the root, node, bun and upstash entry points of the Redis package.
+keywords: [exports, subpath, RedisNode, RedisBun, RedisUpstash]
+---
+
+`@effect-kit/redis` has four entry points. The package is ESM only and its `exports` map has a `types` and a `default` condition for each. Import the root for services and types, then one runtime entry point for the layer.
+
+| Entry point | Import                      | Use                                                                       |
+| ----------- | --------------------------- | ------------------------------------------------------------------------- |
+| `.`         | `@effect-kit/redis`         | Services, commands, errors and types. Runtime neutral, with no transport. |
+| `./node`    | `@effect-kit/redis/node`    | `RedisNode` layers over `node:net` and `node:tls`.                        |
+| `./bun`     | `@effect-kit/redis/bun`     | `RedisBun` layers over `Bun.connect`.                                     |
+| `./upstash` | `@effect-kit/redis/upstash` | `RedisUpstash` layers over Effect HTTP, with SSE events.                  |
+
+Pick one runtime entry point. See [Runtimes](/docs/redis/runtimes).
+
+## `@effect-kit/redis`
+
+### Services
+
+Each service is a `Context.Service` class.
+
+| Export                     | Kind    | Purpose                                                                                      |
+| -------------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `Redis`                    | Service | Ordinary commands, `pipeline`, `transaction`, `execute`, `executePrepared`, `raw` and scans. |
+| `RedisSessions`            | Service | Leased sessions, `withSession`, `withBlockingSession`, `watch` and blocking commands.        |
+| `RedisStreams`             | Service | Continuous stream readers, group consumers and recovery.                                     |
+| `RedisScripts`             | Service | Runs a `RedisScript` by digest and loads it on demand.                                       |
+| `RedisAdmin`               | Service | Server, ACL, config, client and diagnostics commands.                                        |
+| `RedisPubSub`              | Service | `subscribe`, `psubscribe` and `ssubscribe`.                                                  |
+| `RedisTracking`            | Service | Client-side caching invalidation stream. Not in the default layer.                           |
+| `RedisCache`               | Service | Bounded `GET` cache over `RedisTracking`. Not in the default layer.                          |
+| `RedisSearch`              | Service | `aggregate` cursor stream with an owned lease. Needs `RedisSessions`.                        |
+| `RedisMonitor`             | Service | `MONITOR` event stream.                                                                      |
+| `RedisShutdown`            | Service | `SHUTDOWN`.                                                                                  |
+| `RedisCluster`             | Service | Cluster client. Provided by `layerCluster` on a runtime entry point.                         |
+| `RedisSentinel`            | Service | Sentinel client. Provided by `layerSentinel` on a runtime entry point.                       |
+| `RedisCredentials`         | Service | Credential refresh with `rotate`, `get`, `invalidate`, `revision` and `snapshot`.            |
+| `RedisSentinelCredentials` | Service | Credentials for the Sentinel plane.                                                          |
+| `CommandExecutor`          | Service | Runs a `Command`. The seam under `Redis`.                                                    |
+| `BatchExecutor`            | Service | Runs a batch of commands for pipelines and transactions.                                     |
+| `Connection`               | Service | The ordinary connection: `executeOrdinary`, `takePush`, `snapshot`, `close` and `abort`.     |
+| `Transport`                | Service | Opens a socket. The runtime entry points provide it.                                         |
+
+### Namespaces
+
+| Export           | Kind      | Purpose                                                                   |
+| ---------------- | --------- | ------------------------------------------------------------------------- |
+| `Commands`       | Namespace | Every command as a pure `Command` value.                                  |
+| `Reply`          | Namespace | Reply decoders such as `blob`, `text`, `integer`, `optional` and `pairs`. |
+| `RedisKey`       | Namespace | Typed keys: `make`, `text`, `json`, `schemaText`.                         |
+| `PayloadCodec`   | Namespace | Value codecs: `text`, `json`, `schemaText`.                               |
+| `StreamPayload`  | Namespace | A single-field stream entry codec.                                        |
+| `RedisScript`    | Namespace | `make` builds a script with its SHA-1 digest and reply decoder.           |
+| `RedisProfiles`  | Namespace | Deployment profiles for engines and managed providers.                    |
+| `RedisTelemetry` | Namespace | `layer(options?)` turns on metrics and spans.                             |
+
+### Functions and schemas
+
+| Export                 | Kind     | Purpose                                                         |
+| ---------------------- | -------- | --------------------------------------------------------------- |
+| `defineCommand`        | Function | Build a `Command` from metadata, tokens, routing and a decoder. |
+| `fromPreparation`      | Function | Build a `Command` from an effectful preparation step.           |
+| `encodeCommand`        | Function | Encode a command into a RESP frame.                             |
+| `makeRespDecoder`      | Function | Create an incremental RESP decoder.                             |
+| `decodeRedisConfig`    | Function | Validate and normalize connection input.                        |
+| `decodeSentinelConfig` | Function | Validate and normalize Sentinel input.                          |
+| `encodeFloat32`        | Function | Encode coordinates as a float32 vector blob.                    |
+| `expiryAfter`          | Function | Turn a `Duration` into a `SET` expiry.                          |
+| `keySlot`              | Function | Compute the cluster hash slot of a key.                         |
+| `makeConnection`       | Function | Create a scoped connection.                                     |
+| `makeExecutor`         | Function | Create a `RedisExecutor` over a connection.                     |
+| `makeRedis`            | Function | Build the `Redis` client from an executor.                      |
+| `makeRedisAdmin`       | Function | Build `RedisAdmin` from sessions.                               |
+| `makeRedisCluster`     | Function | Build `RedisCluster`.                                           |
+| `makeRedisMonitor`     | Function | Build `RedisMonitor`.                                           |
+| `makeRedisPubSub`      | Function | Build `RedisPubSub`.                                            |
+| `makeRedisScripts`     | Function | Build `RedisScripts`.                                           |
+| `makeRedisSearch`      | Function | Build `RedisSearch`.                                            |
+| `makeRedisSentinel`    | Function | Build `RedisSentinel`.                                          |
+| `makeRedisSessions`    | Function | Build `RedisSessions`.                                          |
+| `makeRedisShutdown`    | Function | Build `RedisShutdown`.                                          |
+| `makeRedisStreams`     | Function | Build `RedisStreams`.                                           |
+| `makeRedisTracking`    | Function | Build `RedisTracking`.                                          |
+| `StreamId`             | Schema   | Schema for a stream ID.                                         |
+| `StreamBound`          | Schema   | Schema for a range bound, with an optional exclusive `(`.       |
+| `StreamPosition`       | Schema   | Schema for an ID or a bare millisecond.                         |
+
+### Errors
+
+Each error is a `Schema.TaggedErrorClass` with its own page section in [Errors](/docs/redis/reference/errors): `AdmissionError`, `BatchError`, `ClusterError`, `CommandInputError`, `ConnectionError`, `CredentialError`, `DiagnosticError`, `HandshakeError`, `PayloadError`, `ProfileError`, `ProtocolError`, `RedisConfigError`, `ReplyError`, `SentinelError`, `ServerError`, `SessionError`, `StreamConsumerError`, `SubscriptionError`, `TransactionError`, `TransportError`, `UnsupportedCommandError`, `UpstashError`.
+
+### Types
+
+**Search.** `SearchAggregateOptions`, `SearchAggregateResult`, `SearchAggregateStep`, `SearchCollectReducer`, `SearchCommonOptions`, `SearchConfiguration`, `SearchCreateOptions`, `SearchCursorOptions`, `SearchDocument`, `SearchField`, `SearchFields`, `SearchHybridOptions`, `SearchHybridVector`, `SearchIndexState`, `SearchLegacyAddOptions`, `SearchOptions`, `SearchProfile`, `SearchReducer`, `SearchResult`, `SearchReturnField`, `SearchScore`, `SearchSpellcheckOptions`, `SearchSpelling`, `SearchSuggestion`, `SearchSuggestionOptions`, `SearchVectorAttributes`.
+
+**TimeSeries.** `TimeSeriesAddOptions`, `TimeSeriesAggregation`, `TimeSeriesAggregator`, `TimeSeriesBlockingReadOptions`, `TimeSeriesBoundary`, `TimeSeriesCreateOptions`, `TimeSeriesGetOptions`, `TimeSeriesGetResult`, `TimeSeriesIncrementOptions`, `TimeSeriesLabelSelection`, `TimeSeriesLabels`, `TimeSeriesMultiAggregation`, `TimeSeriesMultiAggregationOptions`, `TimeSeriesMultiRangeOptions`, `TimeSeriesPivotKey`, `TimeSeriesPivotOptions`, `TimeSeriesRangeOptions`, `TimeSeriesReadCursor`, `TimeSeriesResult`, `TimeSeriesRow`, `TimeSeriesSample`, `TimeSeriesTimestamp`.
+
+**Vectors.** `RawEmbedding`, `VectorAddOptions`, `VectorInput`, `VectorMatch`, `VectorQuery`, `VectorSimilarityOptions`.
+
+**JSON.** `JsonGetOptions`, `JsonMatches`, `JsonNumericLegacy`, `JsonPath`, `JsonSetOptions`.
+
+**Arrays.** `ArrayIndex`, `ArrayInfo`, `ArrayInfoDetails`, `ArrayPredicate`, `ArrayScanOptions`, `ArraySearchBound`, `ArraySearchOptions`.
+
+**Streams.** `AddId`, `AutoClaimOptions`, `BlockingGroupOptions`, `BlockingReadOptions`, `ClaimOptions`, `ClaimPage`, `ClaimedGroupEntry`, `ContinuousReadStreams`, `FailureDecision`, `GroupCreateOptions`, `GroupEntry`, `GroupMessage`, `GroupReadId`, `GroupReadOptions`, `GroupReadStreams`, `GroupReaderKeys`, `GroupSetIdOptions`, `GroupStart`, `PendingEntry`, `PendingOptions`, `PendingReadOptions`, `PendingSummary`, `ProcessingOptions`, `ProcessingOutcome`, `ReadId`, `ReadStreams`, `ReaderOptions`, `ReferencePolicy`, `StreamAddOptions`, `StreamConfigOptions`, `StreamConsumerInfo`, `StreamEntry`, `StreamFieldInput`, `StreamFields`, `StreamFullConsumer`, `StreamFullGroup`, `StreamFullPending`, `StreamGroupInfo`, `StreamIds`, `StreamInfo`, `StreamInfoFull`, `StreamMessage`, `StreamNackOptions`, `StreamRangeOptions`, `StreamRead`, `StreamReadOptions`, `StreamStatistics`, `StreamTrim`.
+
+**Sorted sets and geo.** `GeoAddOptions`, `GeoDetails`, `GeoOrigin`, `GeoPosition`, `GeoQuery`, `GeoResult`, `GeoSelection`, `GeoUnit`, `LexBound`, `RangeLimit`, `Score`, `ScoreBound`, `ScoredMembers`, `SortedAddOptions`, `SortedAlgebraOptions`, `SortedRange`, `SortedRangeWithScores`.
+
+**Strings, keys, bits and lists.** `BitOperation`, `BitPositionRange`, `BitRange`, `BitfieldOperation`, `BitfieldRead`, `CopyOptions`, `DeleteCondition`, `Expiry`, `FloatIncrementExpiryOptions`, `HashExpireCondition`, `HashFields`, `HashSetExpiryOptions`, `IncrementExpiryOptions`, `KeyExpireCondition`, `KeyScanOptions`, `KeyValues`, `LcsMatch`, `LcsMatches`, `ListEnd`, `ListMoveOptions`, `ListPositionOptions`, `MultiSetOptions`, `RedisDecimal`, `RedisInteger`, `RestoreOptions`, `ScanOptions`, `ScanPage`, `SetCardinalityOptions`, `SetCondition`, `SetExpiry`, `SetOptions`, `SetResult`, `SortOptions`, `WriteSetOptions`, `WriteSetResult`.
+
+**Pub/Sub, tracking and diagnostics.** `CacheOptions`, `Invalidation`, `MonitorOptions`, `MonitorRecord`, `PubSubMessage`, `RedisCacheClient`, `RedisMonitorClient`, `RedisPubSubClient`, `RedisShutdownClient`, `RedisTrackingClient`, `ShutdownClosed`, `ShutdownConnectionOptions`, `ShutdownOptions`, `SubscribeOptions`, `SubscriptionEvent`, `SubscriptionOptions`, `TrackingInfo`, `TrackingOptions`, `TrackingRuntimeOptions`.
+
+**Cluster and Sentinel.** `ClusterAddress`, `ClusterMigrationGroups`, `ClusterNode`, `ClusterOptions`, `ClusterScanOptions`, `ClusterShard`, `ClusterSlotRanges`, `ClusterSlotState`, `ClusterSlotStatsOptions`, `ClusterTarget`, `ClusterTopology`, `RedisClusterClient`, `RedisSentinelClient`, `SentinelAddress`, `SentinelConfig`, `SentinelOptions`, `SentinelView`.
+
+**Scripting and info.** `FunctionListOptions`, `InfoSection`, `RedisScriptsClient`, `ScriptArguments`, `ServerInfo`.
+
+**Credentials.** `CredentialInput`, `CredentialLifetime`, `CredentialProvider`, `CredentialSnapshot`, `CredentialValues`, `RedisCredentialService`, `RefreshPolicy`.
+
+**Commands, protocol and connections.** `BatchOutcomes`, `BatchResults`, `BatchSlot`, `Command`, `CommandDefinition`, `CommandMetadata`, `ConnectionOptions`, `ConnectionSnapshot`, `PartialBatchError`, `PreparedCommand`, `PushReply`, `RawContract`, `RedisArgument`, `RedisCommand`, `RedisConnection`, `RedisError`, `RedisExecutor`, `ReplyDecoder`, `RespDecodeLimits`, `RespDecoder`, `RespEncodeLimits`, `RespPairs`, `RespValue`, `Routing`, `TransactionOutcome`, `TransportConnection`.
+
+**Service clients.** `RedisAdminClient`, `RedisClient`, `RedisSearchClient`, `RedisSession`, `RedisSessionsClient`, `RedisStreamsClient`.
+
+**Configuration.** `BlockingOptions`, `DeploymentProfile`, `NetworkPolicy`, `RedisConfig`, `RedisConfigInput`, `ScriptOptions`, `SessionOptions`.
+
+## `@effect-kit/redis/node`
+
+`RedisNode` has six constructors. The `Config` variants take an Effect `Config` of the same input and unwrap it when the layer is built.
+
+| Export                                                                                                       | Kind     | Purpose                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RedisNode.layer`                                                                                            | Layer    | Standalone client from a `NativeClientInput`. Provides `Redis`, `RedisSessions`, `RedisStreams`, `RedisScripts`, `RedisAdmin`, `RedisPubSub`, `RedisCredentials`, `CommandExecutor`, `BatchExecutor` and `Crypto`. |
+| `RedisNode.layerConfig`                                                                                      | Layer    | The same from a `Config<NativeClientInput>`.                                                                                                                                                                       |
+| `RedisNode.layerCluster`                                                                                     | Layer    | Cluster client from a `NativeClusterInput`. Provides `Redis`, `RedisCluster`, `RedisCredentials`, `CommandExecutor`, `BatchExecutor` and `Crypto`.                                                                 |
+| `RedisNode.layerClusterConfig`                                                                               | Layer    | The same from a `Config`.                                                                                                                                                                                          |
+| `RedisNode.layerSentinel`                                                                                    | Layer    | Sentinel client from a `NativeSentinelInput`. Provides `Redis`, `RedisSentinel`, `RedisSentinelCredentials`, `RedisCredentials`, `CommandExecutor`, `BatchExecutor` and `Crypto`.                                  |
+| `RedisNode.layerSentinelConfig`                                                                              | Layer    | The same from a `Config`.                                                                                                                                                                                          |
+| `Transport`                                                                                                  | Service  | Re-export of the root `Transport`.                                                                                                                                                                                 |
+| `connect`                                                                                                    | Function | Open one transport connection.                                                                                                                                                                                     |
+| `layer`                                                                                                      | Layer    | The `Transport` layer for Node. It is not a Redis client.                                                                                                                                                          |
+| `cryptoLayer`                                                                                                | Layer    | `Crypto` for SHA-1 script digests.                                                                                                                                                                                 |
+| `NativeClientInput`, `NativeClusterInput`, `NativeSentinelInput`, `NativeCredentials`, `TransportConnection` | Types    | Input and transport types.                                                                                                                                                                                         |
+
+## `@effect-kit/redis/bun`
+
+The same exports as `./node`, with `RedisBun` in place of `RedisNode` and the Bun transport behind `connect` and `layer`.
+
+| Export                                                                                                        | Kind   | Purpose                               |
+| ------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------- |
+| `RedisBun.layer`, `layerConfig`, `layerCluster`, `layerClusterConfig`, `layerSentinel`, `layerSentinelConfig` | Layers | Same as the `RedisNode` constructors. |
+| `Transport`, `connect`, `layer`, `cryptoLayer`                                                                | Values | Same as `./node`, for Bun.            |
+| `NativeClientInput`, `NativeClusterInput`, `NativeSentinelInput`, `NativeCredentials`, `TransportConnection`  | Types  | Same as `./node`.                     |
+
+## `@effect-kit/redis/upstash`
+
+| Export                                                                                               | Kind      | Purpose                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `RedisUpstash.layer`                                                                                 | Layer     | Upstash client over `fetch`. Provides `Redis`, `CommandExecutor`, `BatchExecutor`, `RedisCredentials` and `UpstashEvents`. |
+| `RedisUpstash.layerWithHttpClient`                                                                   | Layer     | The same, using the `HttpClient` you provide.                                                                              |
+| `RedisUpstash.layerConfig`                                                                           | Layer     | The same from a `Config<UpstashClientInput>`.                                                                              |
+| `layer`                                                                                              | Layer     | A simpler preset that takes an `UpstashConfigInput`.                                                                       |
+| `makeUpstash`                                                                                        | Function  | Build the Upstash client from `{ url, token, ... }`.                                                                       |
+| `decodeUpstashConfig`                                                                                | Function  | Validate an `UpstashConfigInput`.                                                                                          |
+| `UpstashEvents`                                                                                      | Service   | `subscribe(channel)` and `monitor()` over server-sent events. Each returns a scoped `{ messages, close }`.                 |
+| `UpstashError`                                                                                       | Error     | HTTP failures. Also exported from the root.                                                                                |
+| `Commands`                                                                                           | Namespace | Upstash dialect commands for Search, Vector and ACL tokens.                                                                |
+| `UpstashClientInput`, `UpstashConfig`, `UpstashConfigInput`, `UpstashMessage`, `UpstashSubscription` | Types     | Input and event types.                                                                                                     |
+
+Upstash has no `RedisSessions`, `RedisStreams`, `RedisScripts`, `RedisAdmin` or `RedisPubSub`. See [Upstash](/docs/redis/runtimes/upstash).

@@ -1,0 +1,479 @@
+---
+title: Configuration
+description: Look up every connection, limits, sessions, subscriptions and scripts option with its type and default.
+keywords: [RedisNode.layer, timeouts, limits, TLS]
+---
+
+`RedisNode.layer` and `RedisBun.layer` take one `NativeClientInput`: an address, connection settings, and optional groups for `limits`, `connection`, `sessions`, `subscriptions` and `scripts`. `RedisUpstash.layer` takes an `UpstashClientInput`. Every default below is the value in the package source. Sizes are bytes and times are milliseconds.
+
+**Example** (Changing a Few Defaults)
+
+```ts twoslash
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "redis://localhost:6379",
+  commandTimeoutMillis: 10_000,
+  limits: { maxInFlightCommands: 64 },
+  sessions: { maxBlockingConnections: 4 },
+});
+```
+
+## Connection
+
+Give `url` or `endpoint`. Giving both or neither fails with a `RedisConfigError` for `endpoint`. Credentials can be in the URL or in `credentials`, not both.
+
+<TypeTable
+  type={{
+    url: {
+      type: "string",
+      description:
+        "A `redis://` or `rediss://` URL. Choose `url` or `endpoint`, not both. No query or hash; the path is empty or `/<database>`.",
+      required: false,
+    },
+    endpoint: {
+      type: "{ host: string; port?: number; tls?: TlsOptions } | { path: string } | { url: string; tls?: TlsOptions }",
+      description: "TCP host and port, a Unix socket path, or a URL with TLS options.",
+      required: false,
+    },
+    database: {
+      type: "number",
+      description: "Database index. It conflicts with a database in the URL path.",
+      default: "0",
+      required: false,
+    },
+    clientName: {
+      type: "string",
+      description: "Connection name sent with `CLIENT SETNAME`. Printable ASCII with no spaces.",
+      required: false,
+    },
+    protocol: {
+      type: '"resp2" | "resp3" | "auto"',
+      description:
+        "RESP version to negotiate. See [RESP2 and RESP3](/docs/redis/reference/protocol).",
+      default: '"auto"',
+      required: false,
+    },
+    connectTimeoutMillis: {
+      type: "number",
+      description: "Timeout for opening a connection, in milliseconds. Positive integer.",
+      default: "10000",
+      required: false,
+    },
+    commandTimeoutMillis: {
+      type: "number",
+      description: "Timeout for a command reply, in milliseconds. Positive integer.",
+      default: "30000",
+      required: false,
+    },
+    credentials: {
+      type: "CredentialInput",
+      description:
+        "Username and password as `Redacted` values, an Effect that returns them, or `RedisCredentials.provider(effect, policy)`.",
+      required: false,
+    },
+    credentialLifetime: {
+      type: '{ mode: "reconnect" } | { mode: "token-expiry"; retireBeforeMillis?: number } | { mode: "max-age"; maxAgeMillis: number }',
+      description:
+        "When a connection is retired and replaced: `reconnect` on any reconnect, `token-expiry` at `expiresAtMillis` minus `retireBeforeMillis` (default 30000), `max-age` after `maxAgeMillis`.",
+      required: false,
+    },
+    profile: {
+      type: "DeploymentProfile",
+      description: "A deployment policy from `RedisProfiles`.",
+      required: false,
+    },
+    network: {
+      type: "{ allowedHosts: string[]; allowedServerNames?: string[] }",
+      description: "Hosts and TLS server names the client may connect to.",
+      required: false,
+    },
+  }}
+/>
+
+## TLS
+
+`TlsOptions` goes in `endpoint.tls`. A `rediss:` URL verifies the certificate unless you pass `endpoint: { url, tls: { rejectUnauthorized: false } }`. A `redis:` URL with `tls` is a `RedisConfigError`.
+
+<TypeTable
+  type={{
+    serverName: {
+      type: "string",
+      description: "TLS server name to verify.",
+      required: false,
+    },
+    ca: {
+      type: "string",
+      description: "Certificate authority to trust.",
+      required: false,
+    },
+    certificate: {
+      type: "string",
+      description: "Client certificate. Give it together with `privateKey`.",
+      required: false,
+    },
+    privateKey: {
+      type: "string",
+      description: "Client private key. Give it together with `certificate`.",
+      required: false,
+    },
+    rejectUnauthorized: {
+      type: "boolean",
+      description: "Reject servers whose certificate does not verify.",
+      default: "true",
+      required: false,
+    },
+  }}
+/>
+
+## Limits
+
+`limits` sets budgets for what one connection reads and queues. `maxHeaderBytes` and `maxBlobBytes` must not exceed `maxBufferedBytes`. A budget that is exceeded fails the command or the connection and does not truncate data.
+
+<TypeTable
+  type={{
+    maxHeaderBytes: {
+      type: "number",
+      description: "Largest RESP header line, in bytes.",
+      default: "1024",
+      required: false,
+    },
+    maxBlobBytes: {
+      type: "number",
+      description: "Largest single bulk string, in bytes (64 MiB).",
+      default: "67108864",
+      required: false,
+    },
+    maxBufferedBytes: {
+      type: "number",
+      description: "Largest amount of unparsed reply data held, in bytes (64 MiB plus 1024).",
+      default: "67109888",
+      required: false,
+    },
+    maxAggregateEntries: {
+      type: "number",
+      description: "Largest number of entries in one array, map or set.",
+      default: "1000000",
+      required: false,
+    },
+    maxNestingDepth: {
+      type: "number",
+      description: "Deepest nesting of aggregates in a reply.",
+      default: "128",
+      required: false,
+    },
+    maxQueuedCommands: {
+      type: "number",
+      description: "Commands waiting to be written.",
+      default: "1024",
+      required: false,
+    },
+    maxInFlightCommands: {
+      type: "number",
+      description: "Commands written and waiting for a reply.",
+      default: "128",
+      required: false,
+    },
+    maxQueuedBytes: {
+      type: "number",
+      description: "Bytes of commands waiting to be written (16 MiB).",
+      default: "16777216",
+      required: false,
+    },
+    maxInFlightBytes: {
+      type: "number",
+      description: "Bytes of commands written and waiting for a reply (16 MiB).",
+      default: "16777216",
+      required: false,
+    },
+  }}
+/>
+
+## Connection policy
+
+`connection` controls opening, closing and push messages.
+
+<TypeTable
+  type={{
+    reconnectAttempts: {
+      type: "number",
+      description:
+        "Attempts to open a connection before failing. 1 to 10. Only the open is retried, never a command.",
+      default: "3",
+      required: false,
+    },
+    reconnectDelayMillis: {
+      type: "number",
+      description: "Base delay between attempts, doubled each attempt up to 60000. 0 to 60000.",
+      default: "100",
+      required: false,
+    },
+    shutdownTimeoutMillis: {
+      type: "number",
+      description: "How long closing the connection waits for pending work.",
+      default: "5000",
+      required: false,
+    },
+    maxPushMessages: {
+      type: "number",
+      description: "Push messages buffered per connection.",
+      default: "64",
+      required: false,
+    },
+    maxPushBytes: {
+      type: "number",
+      description: "Bytes of push messages buffered per connection (1 MiB).",
+      default: "1048576",
+      required: false,
+    },
+  }}
+/>
+
+## Sessions
+
+`sessions` sizes the pool of leased connections used by `withSession`, `withBlockingSession`, `watch`, blocking commands and batches. See [Sessions](/docs/redis/sessions).
+
+<TypeTable
+  type={{
+    maxSessionConnections: {
+      type: "number",
+      description: "Connections that can be leased to ordinary sessions at once.",
+      default: "4",
+      required: false,
+    },
+    maxBlockingConnections: {
+      type: "number",
+      description: "Connections that can be leased to blocking sessions at once.",
+      default: "2",
+      required: false,
+    },
+    maxWaiters: {
+      type: "number",
+      description:
+        "Callers allowed to wait for a lease. Further callers fail with `SessionError` `pool-full`.",
+      default: "128",
+      required: false,
+    },
+    leaseTimeoutMillis: {
+      type: "number",
+      description: "How long to wait for a lease.",
+      default: "5000",
+      required: false,
+    },
+    cleanupTimeoutMillis: {
+      type: "number",
+      description: "How long to wait for a released session to drain pending replies.",
+      default: "1000",
+      required: false,
+    },
+    maxBatchCommands: {
+      type: "number",
+      description: "Largest number of commands in one pipeline or transaction.",
+      default: "256",
+      required: false,
+    },
+  }}
+/>
+
+## Subscriptions
+
+`subscriptions` bounds `RedisPubSub`. See [Pub/Sub](/docs/redis/pubsub).
+
+<TypeTable
+  type={{
+    maxListeners: {
+      type: "number",
+      description: "Concurrent subscriptions.",
+      default: "128",
+      required: false,
+    },
+    maxInterests: {
+      type: "number",
+      description: "Distinct channels, patterns and shard channels.",
+      default: "1024",
+      required: false,
+    },
+    maxInterestBytes: {
+      type: "number",
+      description: "Bytes across all interest names (1 MiB).",
+      default: "1048576",
+      required: false,
+    },
+    maxWaiters: {
+      type: "number",
+      description: "Callers allowed to wait on subscription operations.",
+      default: "128",
+      required: false,
+    },
+    maxMessages: {
+      type: "number",
+      description: "Messages buffered per subscription.",
+      default: "64",
+      required: false,
+    },
+    maxBytes: {
+      type: "number",
+      description: "Bytes buffered per subscription (1 MiB).",
+      default: "1048576",
+      required: false,
+    },
+    maxRetainedBytes: {
+      type: "number",
+      description: "Bytes buffered across all subscriptions (16 MiB).",
+      default: "16777216",
+      required: false,
+    },
+    heartbeatMillis: {
+      type: "number",
+      description: "Interval between keepalive pings on the subscription connection.",
+      default: "30000",
+      required: false,
+    },
+    reconnectAttempts: {
+      type: "number",
+      description: "Attempts to re-establish a lost subscription connection. 1 to 10.",
+      default: "3",
+      required: false,
+    },
+    reconnectDelayMillis: {
+      type: "number",
+      description: "Base delay between attempts.",
+      default: "100",
+      required: false,
+    },
+  }}
+/>
+
+## Scripts
+
+`scripts` configures `RedisScripts`. See [Lua scripts](/docs/redis/scripts).
+
+<TypeTable
+  type={{
+    maxConcurrentLoads: {
+      type: "number",
+      description: "Script loads running at the same time. 1 to 65536.",
+      default: "64",
+      required: false,
+    },
+    maxSnapshotBytes: {
+      type: "number",
+      description: "Bytes of keys and arguments copied for one script call (16 MiB).",
+      default: "16777216",
+      required: false,
+    },
+    loadScope: {
+      type: '"connection" | "server"',
+      description:
+        "Whether a loaded script is cached per connection or per server. `server` needs proven affinity to one physical server.",
+      default: '"connection"',
+      required: false,
+    },
+  }}
+/>
+
+## Upstash
+
+`RedisUpstash.layer` has no `limits`, `sessions`, `subscriptions` or `scripts` groups. Its limits are flat options.
+
+<TypeTable
+  type={{
+    url: {
+      type: "string",
+      description: "The `https://` URL of the database. No userinfo, query, hash or path.",
+      required: true,
+    },
+    token: {
+      type: "Redacted<string>",
+      description: "Bearer token. Give `token` or `credentials`, not both.",
+      required: false,
+    },
+    credentials: {
+      type: "CredentialInput",
+      description: "Credential source for the bearer token. Give `token` or `credentials`.",
+      required: false,
+    },
+    allowInsecureLocalhost: {
+      type: "boolean",
+      description: "Allow `http://` for `localhost`, `127.0.0.1` and `[::1]` only.",
+      default: "false",
+      required: false,
+    },
+    pipelineResponseFormat: {
+      type: '"array" | "frames"',
+      description:
+        "Response shape of a pipeline. `frames` is for development proxies that concatenate RESP frames.",
+      default: '"array"',
+      required: false,
+    },
+    requestTimeoutMillis: {
+      type: "number",
+      description: "Timeout of one HTTP request.",
+      default: "30000",
+      required: false,
+    },
+    streamHandshakeTimeoutMillis: {
+      type: "number",
+      description: "Timeout for an event stream to connect.",
+      default: "10000",
+      required: false,
+    },
+    streamIdleTimeoutMillis: {
+      type: "number",
+      description: "Close an event stream after this idle time. Unset by default.",
+      required: false,
+    },
+    maxConcurrentRequests: {
+      type: "number",
+      description: "Parallel HTTP requests. Up to 1024.",
+      default: "32",
+      required: false,
+    },
+    maxBatchCommands: {
+      type: "number",
+      description: "Commands in one pipeline or transaction. Up to 10000.",
+      default: "256",
+      required: false,
+    },
+    maxRequestBytes: {
+      type: "number",
+      description: "Largest request body (8 MiB).",
+      default: "8388608",
+      required: false,
+    },
+    maxResponseBytes: {
+      type: "number",
+      description: "Largest response body (16 MiB).",
+      default: "16777216",
+      required: false,
+    },
+    maxNestingDepth: {
+      type: "number",
+      description: "Deepest nesting in a reply. Up to 128.",
+      default: "64",
+      required: false,
+    },
+    maxAggregateEntries: {
+      type: "number",
+      description: "Largest number of entries in one aggregate.",
+      default: "100000",
+      required: false,
+    },
+    maxEventBytes: {
+      type: "number",
+      description: "Largest event stream message (1 MiB).",
+      default: "1048576",
+      required: false,
+    },
+    profile: {
+      type: "DeploymentProfile",
+      description: "A deployment policy. It must route over `http`.",
+      required: false,
+    },
+    network: {
+      type: "{ allowedHosts: string[]; allowedServerNames?: string[] }",
+      description: "Hosts the client may connect to.",
+      required: false,
+    },
+  }}
+/>

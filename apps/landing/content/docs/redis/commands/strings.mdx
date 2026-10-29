@@ -1,0 +1,151 @@
+---
+title: Strings
+description: Look up the string commands on the Redis service, with their commands and reply types.
+---
+
+String commands read and write whole values, counters and byte ranges. The methods below are on the `Redis` service.
+
+**Example** (Typing a Conditional Write and a Counter)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const claimed = yield* redis.set("lock:report", "worker-1", { condition: "NX" });
+  //    ^?
+  const views = yield* redis.incrby("views", 5);
+  //    ^?
+  const previous = yield* redis.set("mode", "fast", { get: true });
+  //    ^?
+
+  return { claimed, views, previous };
+});
+```
+
+`get` returns `Option<string>` and `getBytes` returns `Option<Uint8Array>`. Counters return `bigint`. `set` returns `void`, a `boolean` when you pass a `condition`, and the previous value when you pass `get: true`.
+
+## Methods
+
+| Method              | Command       | Reply type                      | Purpose                                                                         |
+| ------------------- | ------------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `redis.get`         | `GET`         | `Option<string>`                | Read a key as UTF-8 text.                                                       |
+| `redis.getBytes`    | `GET`         | `Option<Uint8Array>`            | Read a key as bytes.                                                            |
+| `redis.set`         | `SET`         | `SetResult<O>`                  | Write a value with an optional condition, expiry or previous-value read.        |
+| `redis.setnx`       | `SETNX`       | `boolean`                       | Set a key only if it does not exist.                                            |
+| `redis.setex`       | `SETEX`       | `void`                          | Set a key with a time to live in seconds.                                       |
+| `redis.psetex`      | `PSETEX`      | `void`                          | Set a key with a time to live in milliseconds.                                  |
+| `redis.mget`        | `MGET`        | `readonly Option<Uint8Array>[]` | Read several keys in one command.                                               |
+| `redis.mset`        | `MSET`        | `void`                          | Write several keys.                                                             |
+| `redis.msetnx`      | `MSETNX`      | `boolean`                       | Write several keys only if none of them exist.                                  |
+| `redis.msetex`      | `MSETEX`      | `boolean`                       | Write several keys with an optional condition and expiry.                       |
+| `redis.append`      | `APPEND`      | `bigint`                        | Append to a value and return the new length.                                    |
+| `redis.strlen`      | `STRLEN`      | `bigint`                        | Return the length of a value in bytes.                                          |
+| `redis.getdel`      | `GETDEL`      | `Option<Uint8Array>`            | Read a key and delete it.                                                       |
+| `redis.getset`      | `GETSET`      | `Option<Uint8Array>`            | Set a value and return the previous one.                                        |
+| `redis.getex`       | `GETEX`       | `Option<Uint8Array>`            | Read a key and change its expiry.                                               |
+| `redis.getrange`    | `GETRANGE`    | `Uint8Array`                    | Read a slice of a value by offset.                                              |
+| `redis.substr`      | `SUBSTR`      | `Uint8Array`                    | Read a slice of a value by offset (older name for GETRANGE).                    |
+| `redis.setrange`    | `SETRANGE`    | `bigint`                        | Overwrite part of a value from an offset.                                       |
+| `redis.incr`        | `INCR`        | `bigint`                        | Increment an integer value by one.                                              |
+| `redis.incrby`      | `INCRBY`      | `bigint`                        | Increment an integer value by an amount.                                        |
+| `redis.incrbyfloat` | `INCRBYFLOAT` | `string`                        | Increment a value by a decimal amount; the result is the server's decimal text. |
+| `redis.decr`        | `DECR`        | `bigint`                        | Decrement an integer value by one.                                              |
+| `redis.decrby`      | `DECRBY`      | `bigint`                        | Decrement an integer value by an amount.                                        |
+| `redis.increx`      | `INCREX`      | `readonly [bigint, bigint]`     | Increment an integer with optional bounds and expiry.                           |
+| `redis.increxFloat` | `INCREX`      | `readonly [string, string]`     | Increment a decimal with optional bounds and expiry.                            |
+| `redis.lcs`         | `LCS`         | `Uint8Array`                    | Return the longest common subsequence of two values.                            |
+| `redis.lcsLength`   | `LCS`         | `bigint`                        | Return only the length of the longest common subsequence.                       |
+| `redis.lcsMatches`  | `LCS`         | `LcsMatches`                    | Return the matching ranges of the longest common subsequence.                   |
+| `redis.digest`      | `DIGEST`      | `Option<Uint8Array>`            | Return the digest of a string value.                                            |
+| `redis.delifeq`     | `DELIFEQ`     | `boolean`                       | Delete a key if its value equals the given value.                               |
+| `redis.delex`       | `DELEX`       | `boolean`                       | Delete a key, optionally under a value or digest condition.                     |
+
+## `SetOptions`
+
+`redis.set` takes `SetOptions`. The type of the options decides the reply type, as shown in `SetResult`. `redis.setKey` takes `WriteSetOptions`, which is `SetOptions` without `get`.
+
+<TypeTable
+  type={{
+    condition: {
+      type: '"NX" | "XX" | { type: "IFEQ" | "IFNE"; value: string | Uint8Array } | { type: "IFDEQ" | "IFDNE"; digest: string }',
+      description:
+        "Write only if the key is absent (NX), present (XX), or its value or digest matches (IFEQ, IFNE, IFDEQ, IFDNE).",
+      required: false,
+    },
+    expiry: {
+      type: '{ type: "EX" | "PX" | "EXAT" | "PXAT"; value: number | bigint } | { type: "KEEPTTL" }',
+      description:
+        "Set a time to live in seconds or milliseconds, an absolute Unix time, or keep the current one.",
+      required: false,
+    },
+    get: {
+      type: "boolean",
+      description: "Return the previous value as Option<Uint8Array>.",
+      required: false,
+    },
+  }}
+/>
+
+`expiryAfter(duration)` turns an Effect `Duration` into an `expiry` value. It rejects durations shorter than one millisecond.
+
+**Example** (Setting a Key With a Duration)
+
+```ts twoslash
+import { Duration, Effect } from "effect";
+
+import { Redis, expiryAfter } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const expiry = yield* expiryAfter(Duration.minutes(5));
+  yield* redis.set("session:abc", "user-42", { expiry });
+});
+```
+
+## `IncrementExpiryOptions`
+
+`redis.increx` takes `IncrementExpiryOptions`. `redis.increxFloat` takes `FloatIncrementExpiryOptions`, where `increment` is required and values are `number | string`.
+
+<TypeTable
+  type={{
+    increment: { type: "number | bigint", description: "Amount to add.", required: false },
+    lower: { type: "number | bigint", description: "Lower bound for the result.", required: false },
+    upper: { type: "number | bigint", description: "Upper bound for the result.", required: false },
+    saturate: {
+      type: "boolean",
+      description: "Clamp to a bound instead of failing.",
+      required: false,
+    },
+    expiry: {
+      type: '{ type: "EX" | "PX" | "EXAT" | "PXAT"; value: number | bigint } | { type: "PERSIST" }',
+      description: "Change the expiry as part of the increment.",
+      required: false,
+    },
+    onlyWithoutExpiry: {
+      type: "boolean",
+      description: "Apply the expiry only to keys that have none.",
+      required: false,
+    },
+  }}
+/>
+
+## Other option types
+
+- `MultiSetOptions` for `redis.msetex`: `{ condition?: "NX" | "XX"; expiry?: SetExpiry }`.
+- `DeleteCondition` for `redis.delex`: `{ type: "IFEQ" | "IFNE" | "IFDEQ" | "IFDNE"; value: string | Uint8Array }`.
+- `Expiry` for `redis.getex`: `{ type: "EX" | "PX" | "EXAT" | "PXAT"; value: number | bigint } | { type: "PERSIST" }`.
+- `LcsMatches` is the `redis.lcsMatches` reply: `{ length: bigint; matches: ReadonlyArray<LcsMatch> }`.
+
+## Typed keys
+
+`redis.getKey` and `redis.setKey` read and write values through a `RedisKey` codec. See [Typed values](/docs/redis/typed-values).
+
+| Method         | Command | Reply type          | Purpose                                           |
+| -------------- | ------- | ------------------- | ------------------------------------------------- |
+| `redis.getKey` | `GET`   | `Option<A>`         | Read a key and decode it with the key's codec.    |
+| `redis.setKey` | `SET`   | `WriteSetResult<O>` | Encode a value with the key's codec and write it. |

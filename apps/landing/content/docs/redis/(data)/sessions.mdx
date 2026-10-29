@@ -1,0 +1,125 @@
+---
+title: Sessions and blocking
+description: Lease a dedicated connection for blocking commands, WATCH and other stateful work.
+keywords: [BLPOP, BZPOPMIN, blocking, withSession, lease]
+---
+
+A **session** is a connection leased from a pool for the length of one body. Commands that wait on the server or keep state on a connection, such as `BLPOP` and `WATCH`, run on a session so they cannot stall ordinary traffic. Sessions come from the `RedisSessions` service.
+
+**Example** (Waiting for a Job With BLPOP)
+
+```ts twoslash
+import { Duration, Effect } from "effect";
+
+import { RedisSessions } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const sessions = yield* RedisSessions;
+
+  const popped = yield* sessions.blpop(["jobs"], { blockFor: Duration.seconds(1) });
+  //    ^?
+
+  return popped;
+});
+```
+
+`blpop` returns `None` when the server times out and `Some([key, value])` when an element arrives. Values are `Uint8Array`. Blocking calls use a separate pool of connections, two by default, so a waiting `BLPOP` does not hold up `redis.get`.
+
+<Callout type="warn" title="Blocking commands need a session">
+  `Redis` has no `blpop`, `brpop`, `bzpopmin` or other blocking methods, and the compiler rejects
+  them. Running a blocking command through `redis.execute` fails with an `UnsupportedCommandError`.
+</Callout>
+
+## Setting how long to wait
+
+`blockFor` is an Effect `Duration` or the string `"forever"`. A bare number does not compile. `timeout` is an optional, separate client-side deadline. Without it the client deadline is `blockFor` plus 1000 milliseconds, or none for `"forever"`.
+
+**Example** (Waiting Forever With a Client Deadline)
+
+```ts twoslash
+import { Duration, Effect } from "effect";
+
+import { RedisSessions } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const sessions = yield* RedisSessions;
+
+  const next = yield* sessions.bzpopmin(["queue"], {
+    blockFor: "forever",
+    timeout: Duration.minutes(5),
+  });
+
+  return next;
+});
+```
+
+The blocking methods on `RedisSessions` are `blpop`, `brpop`, `brpoplpush`, `blmove`, `blmpop`, `blmovem`, `bzpopmin`, `bzpopmax`, `bzmpop`, `xreadBlocking` and `xreadgroupBlocking`. Each returns an `Option`.
+
+## Leasing a session
+
+`withSession` runs a body on one leased connection and returns the connection when the body ends, including on failure or interruption. `withBlockingSession` leases from the blocking pool. Inside the body, `session` has the same command methods as `redis`, plus `pipeline`, `transaction`, `watch` and `unwatch`.
+
+**Example** (Running Commands on One Connection)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { RedisSessions } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const sessions = yield* RedisSessions;
+
+  return yield* sessions.withSession((session) =>
+    Effect.gen(function* () {
+      yield* session.watch(["inventory:7"]);
+
+      const stock = yield* session.get("inventory:7");
+
+      yield* session.unwatch();
+
+      return stock;
+    }),
+  );
+});
+```
+
+Prefer [`sessions.watch`](/docs/redis/transactions) over calling `session.watch` by hand, since it unwatches for you.
+
+A session that runs a command which changes connection state, such as `selectDatabase`, is retired instead of returned to the pool.
+
+## Pool limits and SessionError
+
+Leases are bounded. These options go under `sessions` in the layer settings:
+
+<TypeTable
+  type={{
+    maxSessionConnections: {
+      type: "number",
+      description: "Connections for ordinary sessions.",
+      default: "4",
+      required: false,
+    },
+    maxBlockingConnections: {
+      type: "number",
+      description: "Connections reserved for blocking commands.",
+      default: "2",
+      required: false,
+    },
+    maxWaiters: {
+      type: "number",
+      description: "Callers allowed to wait for a free connection.",
+      default: "128",
+      required: false,
+    },
+    leaseTimeoutMillis: {
+      type: "number",
+      description: "Time a caller waits for a connection.",
+      default: "5000",
+      required: false,
+    },
+  }}
+/>
+
+When the pool is exhausted the call fails with a `SessionError`. `reason: "pool-full"` means the waiter queue is full and `reason: "lease-timeout"` means no connection freed up in time. `sessions.snapshot` reports `connections`, `idle` and `leased`.
+
+Upstash has no sessions. `RedisUpstash` does not provide `RedisSessions`, so none of this applies over HTTP.

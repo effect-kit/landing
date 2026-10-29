@@ -1,0 +1,111 @@
+---
+title: Client-side caching
+description: Keep recently read values in memory and drop them when the server reports a change.
+keywords: [CLIENT TRACKING, invalidation, RedisCache, RedisTracking]
+---
+
+Client-side caching keeps values from `GET` in process memory. The server tracks which keys the connection read and sends an invalidation when one changes, so a cached entry is dropped as soon as someone writes the key. `RedisCache` is a bounded cache of `GET` replies built on `RedisTracking`.
+
+<Callout type="warn" title="Not in the default layer">
+  `RedisNode.layer` and `RedisBun.layer` do not provide `RedisTracking` or `RedisCache`. You add
+  them yourself, with a decoded config and the socket transport. Native sockets only: Upstash over
+  HTTP has no tracking.
+</Callout>
+
+## Adding the layers
+
+`RedisTracking.layer(config)` needs a `RedisConfig` from `decodeRedisConfig` and the `Transport`. The `layer` exported from `@effect-kit/redis/node` or `@effect-kit/redis/bun` is that transport. `RedisCache.layer(options)` sits on top of `RedisTracking`.
+
+**Example** (Building a Cache Layer for Node.js)
+
+```ts twoslash
+import { Effect, Layer } from "effect";
+
+import { RedisCache, RedisTracking, decodeRedisConfig } from "@effect-kit/redis";
+import { layer as NodeTransport } from "@effect-kit/redis/node";
+
+const TrackingLive = Layer.unwrap(
+  decodeRedisConfig({ endpoint: { url: "redis://localhost:6379" } }).pipe(
+    Effect.map((config) => RedisTracking.layer(config)),
+  ),
+);
+
+export const CacheLive = RedisCache.layer({ maxEntries: 500 }).pipe(
+  Layer.provide(TrackingLive),
+  Layer.provide(NodeTransport),
+);
+```
+
+The tracking connection is separate from your command connections. You can run it next to `RedisNode.layer` in the same program.
+
+## Reading through the cache
+
+The cache offers `getBytes`, and `getKey` for a [typed key](/docs/redis/typed-values). The first read goes to the server and fills the cache. Later reads of the same key are served from memory until an invalidation arrives or the entry expires.
+
+**Example** (Reading a Typed Key Through the Cache)
+
+```ts twoslash
+import { Effect, Schema } from "effect";
+
+import { RedisCache, RedisKey } from "@effect-kit/redis";
+
+const Profile = Schema.Struct({ name: Schema.String });
+const profileKey = RedisKey.json("profile:42", Profile);
+
+const program = Effect.gen(function* () {
+  const cache = yield* RedisCache;
+
+  const profile = yield* cache.getKey(profileKey);
+  //    ^?
+  const again = yield* cache.getKey(profileKey);
+
+  return { profile, again };
+});
+```
+
+A key that does not exist is cached too, as `None`. A write from the same process through `tracking.execute` is visible on the next read. `FLUSHDB` sends an invalidation with no key list, which clears the whole cache.
+
+## Cache limits
+
+`CacheOptions` bounds the cache. Every field is optional.
+
+<TypeTable
+  type={{
+    maxEntries: {
+      type: "number",
+      description: "Entries kept in memory.",
+      default: "1024",
+      required: false,
+    },
+    maxBytes: {
+      type: "number",
+      description: "Total size of cached values in bytes.",
+      default: "8388608",
+      required: false,
+    },
+    maxInFlight: {
+      type: "number",
+      description: "Reads that can be loading at once.",
+      default: "128",
+      required: false,
+    },
+    maxKeyBytes: {
+      type: "number",
+      description: "Largest key that is cached, in bytes.",
+      default: "65536",
+      required: false,
+    },
+    maxTtlMillis: {
+      type: "number",
+      description: "Longest an entry stays cached.",
+      default: "30000",
+      required: false,
+    },
+  }}
+/>
+
+`cache.snapshot` reports `entries`, `bytes`, `inFlight` and `active`, and `cache.clear` empties it.
+
+## Invalidation events
+
+`RedisTracking` exposes `events`, a `Stream` of `Invalidate`, `TrackingGap` and `TrackingReady`. An `Invalidate` carries the changed `keys`, or `null` when everything is invalid. The `invalidations` stream carries only `Invalidate` and fails with a `SubscriptionError` whose `reason` is `"tracking-lost"` when the connection loses tracking.

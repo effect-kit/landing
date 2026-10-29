@@ -1,0 +1,267 @@
+---
+title: Errors
+description: Look up every error tag the Redis package can fail with, its fields, reason values and delivery.
+keywords: [delivery, catchTag, ServerError, ConnectionError]
+---
+
+Every failure is a tagged error with a `_tag` you can match with `Effect.catchTag`. Most errors carry `delivery`, which says how far the command got. For how to handle them, see [Errors and retries](/docs/redis/errors).
+
+## What does `delivery` mean?
+
+| Value              | Meaning                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| `unsent`           | Nothing reached the server. Retrying is safe.                                                         |
+| `possibly-written` | Bytes may have reached the server. The command may or may not have run.                               |
+| `replied`          | The server answered. The command ran, or the server refused it.                                       |
+| `unknown`          | Used by `UpstashError` only. An HTTP request may have been processed even though no response arrived. |
+
+The package never replays a command after `possibly-written` or `unknown`.
+
+## Summary
+
+| Error                     | Fields                                                                   | Reason literals                                                                                                                                                                                                             | `delivery`                              |
+| ------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `AdmissionError`          | `reason`, `delivery`                                                     | `count`, `bytes`, `oversized`, `session-required`                                                                                                                                                                           | `unsent`                                |
+| `BatchError`              | `phase`, `execution`, `outcomes`                                         | none                                                                                                                                                                                                                        | none                                    |
+| `ClusterError`            | `delivery`, `reason`, `slot?`                                            | `cross-slot`, `unresolved-keys`, `explicit-target-required`, `node-unavailable`, `invalid-topology`, `invalid-redirect`, `redirect-limit`, `capacity`, `closed`, `timeout`, `database`, `session-route`, `topology-changed` | `unsent`, `replied`                     |
+| `CommandInputError`       | `delivery`, `reason`                                                     | `arguments`, `options`, `metadata`, `routing`                                                                                                                                                                               | `unsent`                                |
+| `ConnectionError`         | `reason`, `delivery`, `generation`, `cause?`                             | `closed`, `transport`, `protocol`, `timeout`, `aborted`, `push-overflow`, `unavailable`, `shutdown-timeout`                                                                                                                 | `unsent`, `possibly-written`            |
+| `CredentialError`         | `reason`, `cause?`                                                       | `configuration`, `acquisition`, `expired`, `timeout`, `capacity`, `closed`, `rotated`, `retirement`                                                                                                                         | none                                    |
+| `DiagnosticError`         | `reason`, `generation`                                                   | `closed`, `overflow`, `concurrent-consumer`, `invalid-frame`, `capacity`                                                                                                                                                    | none                                    |
+| `HandshakeError`          | `delivery`, `stage`, `reason`, `cause?`                                  | `rejected`, `invalid-reply`, `unavailable`, `timeout`, `role-mismatch`                                                                                                                                                      | `unsent`                                |
+| `PayloadError`            | `stage`, `cause`                                                         | none                                                                                                                                                                                                                        | none                                    |
+| `ProfileError`            | `delivery`, `reason`                                                     | `configuration`, `routing`, `tls`, `identity`, `database`, `restricted-command`, `module`, `network-policy`                                                                                                                 | `unsent`                                |
+| `ProtocolError`           | `stage`, `kind`, `offset`, `limit?`, `maximum?`                          | none                                                                                                                                                                                                                        | none                                    |
+| `RedisConfigError`        | `field`, `reason`                                                        | none                                                                                                                                                                                                                        | none                                    |
+| `ReplyError`              | `delivery`, `expected`, `actual`, `path`                                 | none                                                                                                                                                                                                                        | `replied`                               |
+| `SentinelError`           | `delivery`, `reason`, `plane`, `cause?`                                  | `unreachable`, `unknown-service`, `invalid-reply`, `role-mismatch`, `authentication`, `data-unavailable`, `capacity`, `timeout`, `closed`, `topology-changed`, `routing`                                                    | `unsent`, `replied`                     |
+| `ServerError`             | `delivery`, `code`, `reply`                                              | none                                                                                                                                                                                                                        | `replied`                               |
+| `SessionError`            | `reason`, `cause?`, `delivery`                                           | `closed`, `busy`, `transaction-active`, `invalid-state`, `pool-full`, `lease-timeout`, `batch-limit`, `execution-mode`, `routing`, `cleanup`, `generation-lost`                                                             | `unsent`, `replied`, `possibly-written` |
+| `StreamConsumerError`     | `reason`                                                                 | `tombstone`, `acknowledgment-missing`, `invalid-response`, `invalid-policy`                                                                                                                                                 | none                                    |
+| `SubscriptionError`       | `reason`, `generation`                                                   | `closed`, `overflow`, `capacity`, `concurrent-consumer`, `delivery-gap`, `invalid-frame`, `acknowledgment`, `tracking-lost`, `unsupported-command`                                                                          | none                                    |
+| `TransactionError`        | `reason`, `execution`, `errors`                                          | `queue-rejected`, `exec-rejected`                                                                                                                                                                                           | none                                    |
+| `TransportError`          | `stage`, `reason`, `cause?`                                              | `closed`, `unavailable`, `io`, `limit`, `timeout`, `policy`                                                                                                                                                                 | none                                    |
+| `UnsupportedCommandError` | `delivery`, `reason`                                                     | `execution-mode`, `explicit-node`                                                                                                                                                                                           | `unsent`                                |
+| `UpstashError`            | `stage`, `reason`, `delivery`, `status?`, `retryAfterSeconds?`, `cause?` | `configuration`, `credentials`, `authentication`, `status`, `rate-limit`, `network`, `timeout`, `limit`, `encoding`, `malformed`, `unsupported`, `capacity`, `closed`, `gap`                                                | `unsent`, `unknown`, `replied`          |
+
+`RedisError` is the union a command can fail with: `AdmissionError`, `ConnectionError`, `HandshakeError`, `ProtocolError`, `ProfileError`, `CommandInputError`, `ServerError`, `ReplyError`, `SessionError`, `ClusterError`, `SentinelError`, `UnsupportedCommandError` and `UpstashError`. Pipelines fail with `BatchError`, transactions with `TransactionError`, and typed keys with `PayloadError`.
+
+## Errors
+
+### `AdmissionError`
+
+The connection refused to queue a command. `count` means the queued command limit is full, `bytes` means the queued byte budget is full, `oversized` means one command is larger than the budget allows, and `session-required` means the command needs a leased session and was sent on the shared connection. See [`limits`](/docs/redis/reference/configuration#limits) and [Sessions](/docs/redis/sessions).
+
+| Field      | Type    | Values                                            |
+| ---------- | ------- | ------------------------------------------------- |
+| `reason`   | literal | `count`, `bytes`, `oversized`, `session-required` |
+| `delivery` | literal | `unsent`                                          |
+
+### `BatchError`
+
+A pipeline or transaction ended without a clean result for every command. `phase` says where it stopped, `execution` says whether the commands ran, and `outcomes` holds one entry per command. `outcomes` is `Redacted` because replies can contain application data.
+
+| Field       | Type                | Values                                                     |
+| ----------- | ------------------- | ---------------------------------------------------------- |
+| `phase`     | literal             | `pipeline`, `transaction-queue`, `transaction-exec`        |
+| `execution` | literal             | `partial-or-unknown`, `not-executed`, `unknown`, `replied` |
+| `outcomes`  | `Redacted<unknown>` |                                                            |
+
+### `ClusterError`
+
+A cluster routing failure, such as keys in different slots (`cross-slot`), a node that cannot be reached (`node-unavailable`) or too many redirects (`redirect-limit`). `slot` is present when a slot is known. See [Cluster](/docs/redis/cluster).
+
+| Field      | Type     | Values                                                                                                                                                                                                                      |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `delivery` | literal  | `unsent`, `replied`                                                                                                                                                                                                         |
+| `reason`   | literal  | `cross-slot`, `unresolved-keys`, `explicit-target-required`, `node-unavailable`, `invalid-topology`, `invalid-redirect`, `redirect-limit`, `capacity`, `closed`, `timeout`, `database`, `session-route`, `topology-changed` |
+| `slot?`    | `number` |                                                                                                                                                                                                                             |
+
+### `CommandInputError`
+
+A command was rejected before it was sent because its arguments, options, metadata or routing were invalid. Always `unsent`.
+
+| Field      | Type    | Values                                        |
+| ---------- | ------- | --------------------------------------------- |
+| `delivery` | literal | `unsent`                                      |
+| `reason`   | literal | `arguments`, `options`, `metadata`, `routing` |
+
+### `ConnectionError`
+
+The connection failed while a command was queued or in flight. `generation` identifies the physical connection. `delivery` is `unsent` if nothing was written and `possibly-written` if bytes may have reached the server. The package never retries a command after `possibly-written`.
+
+| Field        | Type                | Values                                                                                                      |
+| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `reason`     | literal             | `closed`, `transport`, `protocol`, `timeout`, `aborted`, `push-overflow`, `unavailable`, `shutdown-timeout` |
+| `delivery`   | literal             | `unsent`, `possibly-written`                                                                                |
+| `generation` | `number`            |                                                                                                             |
+| `cause?`     | `Redacted<unknown>` |                                                                                                             |
+
+### `CredentialError`
+
+Credentials could not be configured, acquired or refreshed. `cause` is `Redacted`, and the error never carries a provider response, a token or a URL with credentials. See [Credentials](/docs/redis/credentials).
+
+| Field    | Type                | Values                                                                                              |
+| -------- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `reason` | literal             | `configuration`, `acquisition`, `expired`, `timeout`, `capacity`, `closed`, `rotated`, `retirement` |
+| `cause?` | `Redacted<unknown>` |                                                                                                     |
+
+### `DiagnosticError`
+
+A `RedisMonitor` stream failed. `concurrent-consumer` means a second consumer tried to read a stream that allows one.
+
+| Field        | Type     | Values                                                                   |
+| ------------ | -------- | ------------------------------------------------------------------------ |
+| `reason`     | literal  | `closed`, `overflow`, `concurrent-consumer`, `invalid-frame`, `capacity` |
+| `generation` | `number` |                                                                          |
+
+### `HandshakeError`
+
+Opening a connection failed during setup. `stage` names the step (`auth`, `hello`, `name`, `database`, `role` and others) and `reason` says how it failed. A server that rejects `HELLO` fails with `stage: "hello"` unless `protocol` is `auto` and the rejection is a known unsupported-protocol reply. Always `unsent`.
+
+| Field      | Type                | Values                                                                 |
+| ---------- | ------------------- | ---------------------------------------------------------------------- |
+| `delivery` | literal             | `unsent`                                                               |
+| `stage`    | literal             | `credentials`, `auth`, `hello`, `name`, `database`, `timeout`, `role`  |
+| `reason`   | literal             | `rejected`, `invalid-reply`, `unavailable`, `timeout`, `role-mismatch` |
+| `cause?`   | `Redacted<unknown>` |                                                                        |
+
+### `PayloadError`
+
+A `PayloadCodec` could not encode a value before sending (`encode`) or decode bytes after receiving (`decode`). `cause` is `Redacted`. See [Typed values](/docs/redis/typed-values).
+
+| Field   | Type                | Values             |
+| ------- | ------------------- | ------------------ |
+| `stage` | literal             | `encode`, `decode` |
+| `cause` | `Redacted<unknown>` |                    |
+
+### `ProfileError`
+
+A deployment profile or network policy rejected the configuration or command before sending, for example a restricted command (`restricted-command`), an unsupported module (`module`) or a host outside the allow list (`network-policy`). Always `unsent`.
+
+| Field      | Type    | Values                                                                                                      |
+| ---------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `delivery` | literal | `unsent`                                                                                                    |
+| `reason`   | literal | `configuration`, `routing`, `tls`, `identity`, `database`, `restricted-command`, `module`, `network-policy` |
+
+### `ProtocolError`
+
+The RESP encoder or decoder rejected data. `stage` says whether this happened while validating config, encoding or decoding, and `kind` names the rule. `offset` is the byte position. `limit` and `maximum` name the limit that was exceeded, when there is one. See [RESP2 and RESP3](/docs/redis/reference/protocol).
+
+| Field      | Type     | Values                                                                                                                                                                                                          |
+| ---------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stage`    | literal  | `config`, `encode`, `decode`                                                                                                                                                                                    |
+| `kind`     | literal  | `InvalidLimits`, `InvalidArguments`, `InvalidType`, `InvalidLength`, `InvalidNumber`, `InvalidBoolean`, `InvalidTerminator`, `InvalidVerbatim`, `InvalidPush`, `UnexpectedEnd`, `LimitExceeded`, `InvalidState` |
+| `offset`   | `number` |                                                                                                                                                                                                                 |
+| `limit?`   | `string` |                                                                                                                                                                                                                 |
+| `maximum?` | `number` |                                                                                                                                                                                                                 |
+
+### `RedisConfigError`
+
+A configuration value was invalid. `field` names the option and `reason` is a short message. The error never contains the rejected input.
+
+| Field    | Type     | Values |
+| -------- | -------- | ------ |
+| `field`  | `string` |        |
+| `reason` | `string` |        |
+
+### `ReplyError`
+
+The server replied, but the reply did not have the shape the command expects. `expected` names the shape the decoder wanted, `actual` the received kind and `path` the position in a nested reply. Always `replied`.
+
+| Field      | Type                | Values                                                                                                        |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `delivery` | literal             | `replied`                                                                                                     |
+| `expected` | literal             | `blob`, `text`, `integer`, `safe-integer`, `score`, `status`, `array`, `array-length`, `set-result`, `custom` |
+| `actual`   | `string`            |                                                                                                               |
+| `path`     | `readonly number[]` |                                                                                                               |
+
+### `SentinelError`
+
+Sentinel discovery or routing failed. `plane` says whether the failure was on a Sentinel connection (`sentinel`) or a data node (`data`). See [Sentinel](/docs/redis/sentinel).
+
+| Field      | Type                | Values                                                                                                                                                                   |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `delivery` | literal             | `unsent`, `replied`                                                                                                                                                      |
+| `reason`   | literal             | `unreachable`, `unknown-service`, `invalid-reply`, `role-mismatch`, `authentication`, `data-unavailable`, `capacity`, `timeout`, `closed`, `topology-changed`, `routing` |
+| `plane`    | literal             | `sentinel`, `data`                                                                                                                                                       |
+| `cause?`   | `Redacted<unknown>` |                                                                                                                                                                          |
+
+### `ServerError`
+
+The server answered with an error reply. `code` is the leading error word, such as `WRONGTYPE`, or `ERR` when the reply has none. `reply` holds the full reply as `Redacted` because the text can echo keys and values. Always `replied`.
+
+| Field      | Type                | Values    |
+| ---------- | ------------------- | --------- |
+| `delivery` | literal             | `replied` |
+| `code`     | `string`            |           |
+| `reply`    | `Redacted<unknown>` |           |
+
+### `SessionError`
+
+A leased session or pool operation failed. `pool-full` means `maxWaiters` was reached, `lease-timeout` means no connection became free in time, and `transaction-active` means the session is inside a transaction. See [Sessions](/docs/redis/sessions).
+
+| Field      | Type                | Values                                                                                                                                                          |
+| ---------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reason`   | literal             | `closed`, `busy`, `transaction-active`, `invalid-state`, `pool-full`, `lease-timeout`, `batch-limit`, `execution-mode`, `routing`, `cleanup`, `generation-lost` |
+| `cause?`   | `Redacted<unknown>` |                                                                                                                                                                 |
+| `delivery` | literal             | `unsent`, `replied`, `possibly-written`                                                                                                                         |
+
+### `StreamConsumerError`
+
+A stream consumer could not continue. `tombstone` means a pending entry's payload was deleted or trimmed, `acknowledgment-missing` means `XACK` did not acknowledge the entry, and `invalid-policy` means the processing options were invalid. See [Streams](/docs/redis/streams).
+
+| Field    | Type    | Values                                                                      |
+| -------- | ------- | --------------------------------------------------------------------------- |
+| `reason` | literal | `tombstone`, `acknowledgment-missing`, `invalid-response`, `invalid-policy` |
+
+### `SubscriptionError`
+
+A Pub/Sub or tracking subscription failed. `delivery-gap` means messages may have been lost across a reconnect, `overflow` means a buffer limit was reached and `tracking-lost` means client-side tracking was lost. `generation` identifies the physical connection. See [Pub/Sub](/docs/redis/pubsub).
+
+| Field        | Type     | Values                                                                                                                                             |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reason`     | literal  | `closed`, `overflow`, `capacity`, `concurrent-consumer`, `delivery-gap`, `invalid-frame`, `acknowledgment`, `tracking-lost`, `unsupported-command` |
+| `generation` | `number` |                                                                                                                                                    |
+
+### `TransactionError`
+
+A `MULTI`/`EXEC` transaction was rejected. `queue-rejected` means the server refused a queued command and `exec-rejected` means `EXEC` itself was refused. `execution` says whether the transaction ran (`not-executed`) or is unknown. `errors` is `Redacted`. See [Transactions](/docs/redis/transactions).
+
+| Field       | Type                | Values                            |
+| ----------- | ------------------- | --------------------------------- |
+| `reason`    | literal             | `queue-rejected`, `exec-rejected` |
+| `execution` | literal             | `not-executed`, `unknown`         |
+| `errors`    | `Redacted<unknown>` |                                   |
+
+### `TransportError`
+
+The socket layer failed. `stage` is `open`, `read`, `write` or `close`. Connection setup does not retry `reason: "limit"`.
+
+| Field    | Type                | Values                                                      |
+| -------- | ------------------- | ----------------------------------------------------------- |
+| `stage`  | literal             | `open`, `read`, `write`, `close`                            |
+| `reason` | literal             | `closed`, `unavailable`, `io`, `limit`, `timeout`, `policy` |
+| `cause?` | `Redacted<unknown>` |                                                             |
+
+### `UnsupportedCommandError`
+
+The executor cannot run this command. `execution-mode` means the command is not an ordinary command, such as a blocking one, and needs a session. `explicit-node` means the command targets a specific node, which a standalone executor cannot do. Always `unsent`.
+
+| Field      | Type    | Values                            |
+| ---------- | ------- | --------------------------------- |
+| `delivery` | literal | `unsent`                          |
+| `reason`   | literal | `execution-mode`, `explicit-node` |
+
+### `UpstashError`
+
+An Upstash HTTP request failed. `stage` says whether it failed in config, the request, the response or an event stream. `status` and `retryAfterSeconds` are set when the response carried them. `delivery` can be `unknown` because an HTTP request may have been processed even if no response arrived. See [Upstash](/docs/redis/runtimes/upstash).
+
+| Field                | Type                | Values                                                                                                                                                                       |
+| -------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stage`              | literal             | `config`, `request`, `response`, `stream`                                                                                                                                    |
+| `reason`             | literal             | `configuration`, `credentials`, `authentication`, `status`, `rate-limit`, `network`, `timeout`, `limit`, `encoding`, `malformed`, `unsupported`, `capacity`, `closed`, `gap` |
+| `delivery`           | literal             | `unsent`, `unknown`, `replied`                                                                                                                                               |
+| `status?`            | `number`            |                                                                                                                                                                              |
+| `retryAfterSeconds?` | `number`            |                                                                                                                                                                              |
+| `cause?`             | `Redacted<unknown>` |                                                                                                                                                                              |

@@ -1,0 +1,154 @@
+---
+title: Scaleway
+description: "Send email through Scaleway Transactional Email with the @effect-kit/emails/scaleway Layer."
+---
+
+The `@effect-kit/emails/scaleway` subpath sends messages through [Scaleway Transactional Email](https://www.scaleway.com/en/docs/transactional-email/) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @scaleway/sdk-tem@2.16.3 @scaleway/sdk-client@2.16.0
+```
+
+Both packages are pinned peers and optional until you import this subpath.
+
+## Setup
+
+`Scaleway.layerConfig()` reads these variables:
+
+| Variable         | Required | Value        |
+| ---------------- | -------- | ------------ |
+| `SCW_ACCESS_KEY` | yes      | Access key   |
+| `SCW_SECRET_KEY` | yes      | Secret key   |
+| `SCW_PROJECT_ID` | yes      | Project UUID |
+| `SCW_REGION`     | yes      | `fr-par`     |
+
+**Example** (Sending a Message With Scaleway Transactional Email)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Scaleway from "@effect-kit/emails/scaleway";
+
+const EmailLive = Scaleway.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Scaleway Transactional Email account is allowed to send from.
+
+## Options
+
+`Scaleway.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    accessKey: {
+      type: "string",
+      description: "Access key. Letters and digits only.",
+      required: true,
+    },
+    secretKey: {
+      type: "Redacted<string>",
+      description: "Secret key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    projectId: {
+      type: "string",
+      description: "Project id. Must be a UUID.",
+      required: true,
+    },
+    region: {
+      type: '"fr-par"',
+      description: "The only region the type allows.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Scaleway Transactional Email reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | no            | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An attachment with a `contentId` (feature `inlineAttachments`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- `fr-par` is the only accepted region.
+- The owned client uses the global `fetch` as its HTTP client. Scaleway has no inline image support here, so a `contentId` fails before sending with feature `inlineAttachments`.
+- Scaleway always receives both bodies. A missing `text` or `html` is sent as an empty string.
+- The receipt has one reference per email id Scaleway returns.
+
+## Using your own client
+
+`layerClient` takes any object with `createEmail(message, { signal })`, which a Scaleway `Temv1alpha1.API` has. Its `options` are required, because they carry `projectId` and `region`.
+
+**Example** (Borrowing a Scaleway Transactional Email Client)
+
+```ts
+import { createAdvancedClient, withProfile } from "@scaleway/sdk-client";
+import { Temv1alpha1 } from "@scaleway/sdk-tem";
+import * as Scaleway from "@effect-kit/emails/scaleway";
+
+const client = createAdvancedClient(
+  withProfile({ accessKey: "SCWFAKEACCESSKEY", secretKey: "fake-secret" }),
+);
+
+const EmailLive = Scaleway.layerClient(new Temv1alpha1.API(client), {
+  projectId: "11111111-1111-4111-8111-111111111111",
+  region: "fr-par",
+});
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "scaleway"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`       | Raised when                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `timeout`     | The timeout is not finite and positive.                      |
+| `token`       | The secret key is not printable ASCII without spaces.        |
+| `projectId`   | The project id is not a UUID.                                |
+| `region`      | The region is not `fr-par`.                                  |
+| `accessKey`   | The access key has characters other than letters and digits. |
+| `credentials` | The SDK client could not be created from the keys.           |
+
+| Scaleway failure          | Reason               |
+| ------------------------- | -------------------- |
+| SDK `QuotasExceededError` | `QuotaExceededError` |
+| SDK `AbortError`          | `TransportError`     |
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors). A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`.

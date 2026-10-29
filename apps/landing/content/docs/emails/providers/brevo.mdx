@@ -1,0 +1,151 @@
+---
+title: Brevo
+description: "Send email through Brevo with the @effect-kit/emails/brevo Layer."
+---
+
+The `@effect-kit/emails/brevo` subpath sends messages through [Brevo](https://developers.brevo.com) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @getbrevo/brevo@6.2.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Brevo.layerConfig()` reads these variables:
+
+| Variable        | Required | Value   |
+| --------------- | -------- | ------- |
+| `BREVO_API_KEY` | yes      | API key |
+
+**Example** (Sending a Message With Brevo)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Brevo from "@effect-kit/emails/brevo";
+
+const EmailLive = Brevo.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Brevo account is allowed to send from.
+
+## Options
+
+`Brevo.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Brevo reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency        |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ------------------ |
+| yes  | yes  | yes  | yes         | yes | yes | one      | yes     | no          | no            | reject, 30 minutes |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- More than one `replyTo` address (feature `multipleReplyTo`).
+- Any attachment (feature `attachments`).
+
+## Idempotency
+
+Mode `reject`, with a retention of 30 minutes. A repeated key is refused rather than replayed.
+
+The key must be a UUID, otherwise the send fails with `InvalidMessageError` (path `idempotencyKey`) before sending. The package sends it to Brevo as a header named `idempotencyKey`, so a custom header with that name (any case) fails with `InvalidMessageError` (path `headers`).
+
+When Brevo answers `duplicate_parameter`, the send fails with `IdempotencyConflictError` and `acceptance: "unknown"`.
+
+**Example** (Sending With an Idempotency Key)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Welcome",
+      text: "Your account is ready.",
+    },
+    { idempotencyKey: "3f2504e0-4f89-41d3-9a0c-0305e82c3301" },
+  );
+});
+```
+
+## Provider notes
+
+- Brevo takes one reply-to address and no attachments through the shared API. Both fail before sending: a second `replyTo` address with feature `multipleReplyTo`, an attachment with feature `attachments`.
+- Retries are off on the owned client (`maxRetries: 0`).
+
+## Using your own client
+
+`layerClient` takes any object with `transactionalEmails.sendTransacEmail(message, options)`, which a `BrevoClient` has. `options` is optional.
+
+**Example** (Borrowing a Brevo Client)
+
+```ts
+import { BrevoClient } from "@getbrevo/brevo";
+import * as Brevo from "@effect-kit/emails/brevo";
+
+const client = new BrevoClient({ apiKey: "fake-key", maxRetries: 0 });
+
+const EmailLive = Brevo.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. The package calls the client with `maxRetries: 0` per request, so a borrowed client does not retry sends either.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "brevo"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                        |
+| --------- | -------------------------------------------------- |
+| `timeout` | The timeout is not finite and positive.            |
+| `token`   | The API key is not printable ASCII without spaces. |
+
+| Brevo error code                                               | Reason                                               |
+| -------------------------------------------------------------- | ---------------------------------------------------- |
+| `duplicate_parameter`                                          | `IdempotencyConflictError` (`acceptance: "unknown"`) |
+| `not_enough_credits`, `insufficient_credits`, `quota_exceeded` | `QuotaExceededError`                                 |
+| `permission_denied`                                            | `PermissionDeniedError`                              |
+| `recipient_blacklisted`, `recipient_rejected`                  | `MessageRejectedError`                               |
+| SDK timeout error                                              | `TimeoutError`                                       |
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors). A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`.

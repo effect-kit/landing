@@ -1,0 +1,145 @@
+---
+title: Pub/Sub
+description: Subscribe to channels and patterns as Streams, and handle reconnects and overflow explicitly.
+keywords: [SUBSCRIBE, PSUBSCRIBE, SSUBSCRIBE, PUBLISH, channels]
+---
+
+`RedisPubSub` turns a Redis subscription into a scoped value with a `Stream` of messages. `redis.publish` sends one. Subscribing needs the `RedisPubSub` service, which the Node.js and Bun layers provide.
+
+**Example** (Publishing and Receiving a Message)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { Redis, RedisPubSub } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  const pubsub = yield* RedisPubSub;
+  const subscription = yield* pubsub.subscribe(["events"]);
+
+  yield* redis.publish("events", "hello");
+
+  const [message] = yield* subscription.messages.pipe(Stream.take(1), Stream.runCollect);
+  return message && new TextDecoder().decode(message.payload);
+  //     ^?
+});
+
+export const runnable = program.pipe(Effect.scoped, Effect.provide(RedisLive));
+```
+
+The `subscribe` effect resolves only after the server acknowledges the subscription, so a message published right after it is not missed. The subscription lives in the surrounding `Scope`. Closing the scope unsubscribes and waits for the server's confirmation. You can also call `subscription.close()`.
+
+`redis.publish` returns the number of subscribers that received the message, as a `bigint`.
+
+## Reading messages
+
+A subscription has two streams over the same queue:
+
+- `messages` is a `Stream<PubSubMessage>`.
+- `events` is a `Stream<SubscriptionEvent>`: the same messages plus `Ready` and `DeliveryGap` markers.
+
+Read one of them at a time. A second concurrent reader fails with `SubscriptionError` where `reason` is `"concurrent-consumer"`.
+
+`channel` and `payload` are `Uint8Array`. Nothing is decoded for you, so a message can carry binary data. Decode explicitly, as the example does with `TextDecoder`, or with a `PayloadCodec`.
+
+## Subscribing to patterns
+
+`psubscribe` matches channels by glob pattern. A pattern message has `_tag: "PatternMessage"` and a `pattern` field.
+
+**Example** (Subscribing to Every Order Channel)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { RedisPubSub } from "@effect-kit/redis";
+
+export const orders = Effect.gen(function* () {
+  const pubsub = yield* RedisPubSub;
+  const subscription = yield* pubsub.psubscribe(["orders:*"]);
+
+  return subscription.messages.pipe(
+    Stream.map((message) => {
+      const channel = new TextDecoder().decode(message.channel);
+      return message._tag === "PatternMessage"
+        ? { channel, pattern: message.pattern }
+        : { channel };
+    }),
+  );
+});
+```
+
+`ssubscribe` subscribes to sharded channels, which pair with `redis.spublish`. Sharded Pub/Sub needs a server that supports it: Redis 7.0 or later. On older versions the server rejects the command with a `ServerError`. `subscribe`, `psubscribe` and `ssubscribe` take a non-empty list.
+
+Subscribing twice to the same channel shares one server subscription, and each subscriber gets its own stream.
+
+## Reconnects and delivery gaps
+
+When the connection drops, messages published in the meantime are lost. Pub/Sub has no replay. The package makes the loss visible through `recovery`.
+
+| `recovery`         | When the connection drops                                                               |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `"fail"` (default) | The stream fails with `SubscriptionError` and the subscription ends                     |
+| `"resubscribe"`    | The package reconnects and subscribes again. `events` emits `DeliveryGap`, then `Ready` |
+
+**Example** (Reacting to a Delivery Gap)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { RedisPubSub } from "@effect-kit/redis";
+
+export const watch = Effect.gen(function* () {
+  const pubsub = yield* RedisPubSub;
+  const subscription = yield* pubsub.subscribe(["events"], { recovery: "resubscribe" });
+
+  yield* subscription.events.pipe(
+    Stream.runForEach((event) =>
+      event._tag === "DeliveryGap"
+        ? Effect.log("messages may have been missed; reload state")
+        : Effect.void,
+    ),
+  );
+});
+```
+
+`resubscribe` does not replay anything. After a `DeliveryGap`, reload whatever state the messages were keeping current. If you read `messages` instead of `events`, a gap fails the stream with `reason: "delivery-gap"`, so lost delivery is never hidden.
+
+The restore step makes up to `subscriptions.reconnectAttempts` attempts (default `3`, at most `10`), waiting `subscriptions.reconnectDelayMillis` (default `100` ms) between them. If the last one fails, every subscription on the layer fails.
+
+## Overflow
+
+Each subscription has a bounded queue. If your code reads more slowly than messages arrive and the queue exceeds `maxMessages` (default `64`) or `maxBytes` (default `1048576`, 1 MiB), the stream fails with `SubscriptionError` and `reason: "overflow"`. Messages are not dropped silently.
+
+| `SubscriptionError` reason | Meaning                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `overflow`                 | The queue or a retained-bytes budget was exceeded                         |
+| `delivery-gap`             | `messages` hit a gap after a reconnect                                    |
+| `concurrent-consumer`      | Two readers on one subscription                                           |
+| `capacity`                 | Too many listeners or interests (`maxListeners` 128, `maxInterests` 1024) |
+| `closed`                   | The subscription or client was closed                                     |
+
+Move slow work out of the read loop, for example by forking per message or handing it to a bounded queue, so the reader stays ahead of the queue. All subscriptions on a layer also share a retained budget of `maxRetainedBytes` (default 16 MiB). Set the limits in `subscriptions` on the layer.
+
+## Pub/Sub on Upstash
+
+<Callout type="warn" title="Text only on Upstash">
+  Upstash over HTTP does not provide `RedisPubSub`. Use `UpstashEvents.subscribe(channel)`, which
+  streams text messages over SSE, one channel per call.
+</Callout>
+
+**Example** (Subscribing over HTTP)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { UpstashEvents } from "@effect-kit/redis/upstash";
+
+export const listen = Effect.gen(function* () {
+  const events = yield* UpstashEvents;
+  const subscription = yield* events.subscribe("events");
+
+  return yield* subscription.messages.pipe(Stream.take(1), Stream.runCollect);
+}).pipe(Effect.scoped);
+```
+
+Each message is `{ channel: string, message: string }`. Channel names cannot contain commas or line breaks. Publishing is the same `redis.publish`.

@@ -1,0 +1,118 @@
+---
+title: Pipelines
+description: Send several commands in one round trip and get one result per command.
+keywords: [pipeline, batch, BatchResults, BatchError]
+---
+
+A **pipeline** writes several commands before it waits for any reply, then returns one `Result` per command in the same order. Each command keeps its own success type, and one failure does not hide the others.
+
+**Example** (Pipelining a Write and a Counter)
+
+```ts twoslash
+import { Effect, Result } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const results = yield* redis.pipeline([
+    Commands.set("{account:42}:name", "Ada"),
+    Commands.incr("{account:42}:visits"),
+  ]);
+
+  const [saved, visits] = results;
+  //     ^?
+
+  if (Result.isFailure(visits)) return yield* visits.failure;
+
+  return visits.success;
+});
+```
+
+`redis.pipeline` takes `Commands.*` values. The result is a tuple, so `saved` is typed for `set` and `visits` for `incr`. The Effect fails only when the batch as a whole fails. A command the server rejects comes back as a `Failure` inside the tuple.
+
+<Callout type="warn" title="Pipelines are not atomic">
+  A pipeline is not a transaction. Other clients can run commands between yours, and commands that
+  succeed stay applied when a later one fails. Use a [transaction](/docs/redis/transactions) when
+  the commands must run together.
+</Callout>
+
+## Checking each result
+
+A failing command does not fail the pipeline, so the Effect succeeds even when a result is a `Failure`. Ignoring the results hides the error.
+
+**Example** (Reading a Failure From a Pipeline)
+
+```ts twoslash
+import { Effect, Result } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const [saved, counted] = yield* redis.pipeline([
+    Commands.set("profile:name", "Ada"),
+    Commands.incr("profile:name"),
+  ]);
+
+  // Wrong: the pipeline succeeded, but INCR failed on a text value.
+  // return "ok";
+
+  // Right: look at each result. SET is still applied.
+  if (Result.isFailure(counted)) {
+    return `set ok: ${Result.isSuccess(saved)}, incr failed: ${counted.failure._tag}`;
+  }
+
+  return "both ran";
+});
+// Output: set ok: true, incr failed: ServerError
+```
+
+Each failure is a `ServerError` or a `ReplyError`, or an error from a custom decoder.
+
+## When the whole batch fails
+
+If the connection fails or the fiber is interrupted partway through, the pipeline fails with a `BatchError`. Its `outcomes` field is `Redacted` because replies can hold your data. It records what happened to each command by index: `Completed`, `Replied`, `Unsent` or `Unknown`.
+
+**Example** (Inspecting Per-Command Outcomes)
+
+```ts twoslash
+import { Effect, Redacted } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  return yield* redis
+    .pipeline([Commands.incr("jobs:done"), Commands.incr("jobs:total")])
+    .pipe(
+      Effect.catchTag("BatchError", (error) =>
+        Effect.succeed(Redacted.value(error.outcomes).map((slot) => slot._tag)),
+      ),
+    );
+});
+```
+
+A slot marked `Unsent` never reached the server. A slot marked `Unknown` may have run. `execution` on the error summarizes the batch: `partial-or-unknown`, `not-executed`, `unknown` or `replied`.
+
+## Batch limits
+
+A pipeline holds at most `maxBatchCommands` commands, which defaults to `256`. A longer one fails before anything is written, with a `SessionError` whose `reason` is `"batch-limit"`. An empty pipeline returns `[]`.
+
+Set the limit in the layer's `sessions` options.
+
+**Example** (Raising the Batch Limit)
+
+```ts twoslash
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "redis://localhost:6379",
+  sessions: { maxBatchCommands: 1000 },
+});
+```
+
+On a cluster, give the keys in one pipeline the same hash tag, as the `{account:42}` keys above do. See [multi-key commands](/docs/redis/cluster/multi-key).

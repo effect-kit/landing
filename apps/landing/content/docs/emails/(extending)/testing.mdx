@@ -1,0 +1,173 @@
+---
+title: Testing
+description: Replace the provider with an in-memory Email layer, script its responses, and assert on every message your code tried to send.
+keywords: ["EmailTest", "mock", "outbox", "test layer"]
+---
+
+`EmailTest.layer()` provides the `Email` service without a provider or network. It also provides an `EmailTest` service that records what was sent. Import it from the `testing` subpath, which needs only Effect.
+
+**Example** (Asserting One Email Was Sent)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import { EmailTest } from "@effect-kit/emails/testing";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  const outbox = yield* EmailTest;
+
+  yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+
+  const messages = yield* outbox.messages;
+  //      ^?
+  return messages.length;
+}).pipe(Effect.provide(EmailTest.layer()));
+```
+
+`messages` is a snapshot of every attempted submission, in order. Each entry is a `NormalizedEmailMessage`: `from` is a mailbox object and `to`, `cc`, `bcc` and `replyTo` are arrays of mailboxes, whatever form you passed.
+
+**Example** (Using the Layer in a Vitest Test)
+
+```ts
+import { Effect } from "effect";
+import { expect, it } from "vitest";
+import { Email } from "@effect-kit/emails";
+import { EmailTest } from "@effect-kit/emails/testing";
+
+const sendWelcome = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+it("sends one welcome email", async () => {
+  const messages = await Effect.runPromise(
+    Effect.gen(function* () {
+      yield* sendWelcome;
+      return yield* (yield* EmailTest).messages;
+    }).pipe(Effect.provide(EmailTest.layer())),
+  );
+
+  expect(messages).toHaveLength(1);
+  expect(messages[0]?.subject).toBe("Welcome");
+});
+```
+
+## What the layer does
+
+`EmailTest.layer` goes through the same path as a real provider: it validates the message, checks capabilities and records a span. A message that fails validation or a capability check never reaches the outbox, as in production.
+
+Each use of the layer starts with an empty outbox. Without scripted responses, every send succeeds with an `accepted` receipt whose reference is `email-test-1`, `email-test-2` and so on.
+
+## Options
+
+<TypeTable
+  type={{
+    provider: {
+      type: "string",
+      description: "Name reported in receipts, errors and spans.",
+      default: '"test"',
+      required: false,
+    },
+    capabilities: {
+      type: "EmailCapabilities",
+      description:
+        "What the fake provider supports. The default allows every field, multiple reply-to addresses, and has no idempotency.",
+      required: false,
+    },
+    responses: {
+      type: "ReadonlyArray<Effect<SendReceipt, EmailError>>",
+      description: "One Effect per attempted send, in order. Without it, every send succeeds.",
+      required: false,
+    },
+  }}
+/>
+
+## Scripting responses
+
+Give `responses` one Effect per attempt. Use `Effect.succeed` with a receipt for a send that works and `Effect.fail` with an `EmailError` for one that does not. A failed attempt is still recorded in the outbox.
+
+**Example** (Failing the First Send, Then Succeeding)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email, EmailError, RateLimitedError } from "@effect-kit/emails";
+import { EmailTest } from "@effect-kit/emails/testing";
+
+const rateLimited = Effect.fail(
+  new EmailError({
+    provider: "test",
+    operation: "send",
+    acceptance: "rejected",
+    reason: new RateLimitedError({}),
+  }),
+);
+
+const accepted = Effect.succeed({
+  provider: "test",
+  status: "accepted" as const,
+  references: [{ kind: "providerMessageId" as const, value: "msg-1" }],
+});
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  const outbox = yield* EmailTest;
+
+  yield* email
+    .send({
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Welcome",
+      text: "Your account is ready.",
+    })
+    .pipe(Effect.retry({ times: 1 }));
+
+  return (yield* outbox.messages).length;
+  // Output: 2
+}).pipe(Effect.provide(EmailTest.layer({ responses: [rateLimited, accepted] })));
+```
+
+<Callout type="warn" title="A script that runs out is a defect">
+  If your code sends more times than `responses` has entries, the extra send dies with an error
+  saying the script was exhausted. It is never an implicit success, so a runaway retry loop fails
+  the test.
+</Callout>
+
+## Testing idempotency and capabilities
+
+The default capabilities have no idempotency, so a test that passes an `idempotencyKey` fails with `UnsupportedFeatureError`. Enable it, or restrict other fields, through `capabilities`.
+
+**Example** (Testing Against a Provider Without Attachments)
+
+```ts
+import { EmailTest } from "@effect-kit/emails/testing";
+
+const layer = EmailTest.layer({
+  provider: "mailersend",
+  capabilities: {
+    text: true,
+    html: true,
+    htmlAndText: true,
+    senderName: true,
+    cc: true,
+    bcc: true,
+    replyTo: "single",
+    headers: true,
+    attachments: false,
+    inlineAttachments: false,
+    idempotency: { mode: "unsupported" },
+  },
+});
+```
+
+The `EmailTest` service has no inbox UI and no HTTP sink. To test a provider layer itself, pass a fake client to its `layerClient`.

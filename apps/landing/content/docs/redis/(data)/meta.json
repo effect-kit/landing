@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "running-commands",
+    "typed-values",
+    "pipelines",
+    "transactions",
+    "sessions",
+    "scanning",
+    "scripts",
+    "caching"
+  ]
+}

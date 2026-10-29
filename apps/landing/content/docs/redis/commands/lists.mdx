@@ -1,0 +1,114 @@
+---
+title: Lists
+description: Look up the list commands and the blocking list commands on RedisSessions.
+---
+
+List commands push and pop elements at either end and move elements between lists. Elements are bytes.
+
+**Example** (Pushing and Popping)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const length = yield* redis.rpush("jobs", ["resize", "email", "index"]);
+  //    ^?
+  const next = yield* redis.lpop("jobs");
+  //    ^?
+  const batch = yield* redis.lpopCount("jobs", 2);
+  //    ^?
+
+  return { length, next, batch };
+});
+```
+
+`lpop` returns `Option<Uint8Array>` and `lpopCount` returns `Option<readonly Uint8Array[]>`, because a count changes the reply from one optional element to an optional aggregate.
+
+## Methods
+
+| Method            | Command     | Reply type                                             | Purpose                                                          |
+| ----------------- | ----------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `redis.lpush`     | `LPUSH`     | `bigint`                                               | Push values onto the head.                                       |
+| `redis.rpush`     | `RPUSH`     | `bigint`                                               | Push values onto the tail.                                       |
+| `redis.lpushx`    | `LPUSHX`    | `bigint`                                               | Push onto the head only if the list exists.                      |
+| `redis.rpushx`    | `RPUSHX`    | `bigint`                                               | Push onto the tail only if the list exists.                      |
+| `redis.lpop`      | `LPOP`      | `Option<Uint8Array>`                                   | Pop one element from the head.                                   |
+| `redis.rpop`      | `RPOP`      | `Option<Uint8Array>`                                   | Pop one element from the tail.                                   |
+| `redis.lpopCount` | `LPOP`      | `Option<readonly Uint8Array[]>`                        | Pop several elements from the head.                              |
+| `redis.rpopCount` | `RPOP`      | `Option<readonly Uint8Array[]>`                        | Pop several elements from the tail.                              |
+| `redis.llen`      | `LLEN`      | `bigint`                                               | Return the list length.                                          |
+| `redis.lindex`    | `LINDEX`    | `Option<Uint8Array>`                                   | Read the element at an index.                                    |
+| `redis.lrange`    | `LRANGE`    | `readonly Uint8Array[]`                                | Read a range of elements.                                        |
+| `redis.ltrim`     | `LTRIM`     | `void`                                                 | Keep only a range of elements.                                   |
+| `redis.lset`      | `LSET`      | `void`                                                 | Set the element at an index.                                     |
+| `redis.lrem`      | `LREM`      | `bigint`                                               | Remove matching elements and return how many were removed.       |
+| `redis.linsert`   | `LINSERT`   | `bigint`                                               | Insert before or after a pivot element.                          |
+| `redis.lpos`      | `LPOS`      | `Option<bigint>`                                       | Find the index of an element.                                    |
+| `redis.lposCount` | `LPOS`      | `readonly bigint[]`                                    | Find several indexes of an element.                              |
+| `redis.lmove`     | `LMOVE`     | `Option<Uint8Array>`                                   | Pop from one list and push onto another.                         |
+| `redis.rpoplpush` | `RPOPLPUSH` | `Option<Uint8Array>`                                   | Pop from the tail of one list and push onto the head of another. |
+| `redis.lmovem`    | `LMOVEM`    | `Option<readonly Uint8Array[]>`                        | Move several elements between lists.                             |
+| `redis.lmpop`     | `LMPOP`     | `Option<readonly [Uint8Array, readonly Uint8Array[]]>` | Pop elements from the first non-empty list.                      |
+
+## Blocking commands
+
+<Callout type="warn" title="Blocking commands need a session">
+  `redis.blpop` and the other blocking commands do not exist on `Redis`. They hold a connection
+  while they wait, so they live on `RedisSessions` and take `BlockingOptions`. See
+  [Sessions](/docs/redis/sessions).
+</Callout>
+
+These methods are on `RedisSessions`. Each takes `BlockingOptions` and returns `None` when the wait ends with nothing to pop.
+
+| Method                | Command      | Reply type                                             | Purpose                                                                       |
+| --------------------- | ------------ | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `sessions.blpop`      | `BLPOP`      | `Option<readonly [Uint8Array, Uint8Array]>`            | Pop from the head of the first non-empty list, waiting if all are empty.      |
+| `sessions.brpop`      | `BRPOP`      | `Option<readonly [Uint8Array, Uint8Array]>`            | Pop from the tail of the first non-empty list, waiting if all are empty.      |
+| `sessions.brpoplpush` | `BRPOPLPUSH` | `Option<Uint8Array>`                                   | Move the tail of one list to the head of another, waiting for an element.     |
+| `sessions.blmove`     | `BLMOVE`     | `Option<Uint8Array>`                                   | Move an element between lists, waiting for an element.                        |
+| `sessions.blmovem`    | `BLMOVEM`    | `Option<readonly Uint8Array[]>`                        | Move several elements between lists, waiting for elements.                    |
+| `sessions.blmpop`     | `BLMPOP`     | `Option<readonly [Uint8Array, readonly Uint8Array[]]>` | Pop several elements from the first non-empty list, waiting if all are empty. |
+
+**Example** (Waiting for a Job)
+
+```ts twoslash
+import { Duration, Effect } from "effect";
+
+import { RedisSessions } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const sessions = yield* RedisSessions;
+
+  const job = yield* sessions.blpop(["jobs"], { blockFor: Duration.seconds(5) });
+  //    ^?
+
+  return job;
+});
+```
+
+## `BlockingOptions`
+
+<TypeTable
+  type={{
+    blockFor: {
+      type: 'Duration | "forever"',
+      description: "How long the server waits for an element.",
+      required: true,
+    },
+    timeout: {
+      type: 'Duration | "forever"',
+      description: "How long the client waits for the reply.",
+      required: false,
+    },
+  }}
+/>
+
+## Option types
+
+- `ListEnd` is `"LEFT" | "RIGHT"`, used by `lmove`, `lmovem`, `lmpop` and `blmove`.
+- `ListMoveOptions` for `lmovem` and `blmovem`: `{ selection: "COUNT" | "EXACTLY"; count: number | bigint; ordering: "OBO" | "BULK" }`.
+- `ListPositionOptions` for `lpos` and `lposCount`: `{ rank?: number | bigint; maxLength?: number | bigint }`.

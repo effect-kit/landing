@@ -1,0 +1,191 @@
+---
+title: Sorted sets
+description: Look up the sorted set commands, range types and blocking pops with their reply types.
+---
+
+Sorted set commands keep members ordered by score. Most score replies are the server's decimal text (`string`), so large and infinite values are not rounded.
+
+**Example** (Ranking Players)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.zadd("scores", [
+    [120, "ada"],
+    [95, "grace"],
+    [140, "linus"],
+  ]);
+
+  const top = yield* redis.zrangeWithScores("scores", {
+    //  ^?
+    by: "rank",
+    start: 0,
+    end: 1,
+    reverse: true,
+  });
+  const rank = yield* redis.zrank("scores", "ada");
+  //    ^?
+  const score = yield* redis.zscore("scores", "ada");
+  //    ^?
+
+  return { top, rank, score };
+});
+```
+
+`zscore` returns `Option<number>`. Use `zscoreToken` to keep the decimal text.
+
+## Methods
+
+| Method                             | Command            | Reply type                                                                  | Purpose                                                    |
+| ---------------------------------- | ------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `redis.zadd`                       | `ZADD`             | `bigint`                                                                    | Add or update members with scores.                         |
+| `redis.zaddIncrement`              | `ZADD`             | `Option<string>`                                                            | Add a score to one member (INCR) and return the new score. |
+| `redis.zincrby`                    | `ZINCRBY`          | `string`                                                                    | Increment a member's score.                                |
+| `redis.zrem`                       | `ZREM`             | `bigint`                                                                    | Remove members.                                            |
+| `redis.zcard`                      | `ZCARD`            | `bigint`                                                                    | Count the members.                                         |
+| `redis.zcount`                     | `ZCOUNT`           | `bigint`                                                                    | Count members within a score range.                        |
+| `redis.zlexcount`                  | `ZLEXCOUNT`        | `bigint`                                                                    | Count members within a lexicographic range.                |
+| `redis.zscore`                     | `ZSCORE`           | `Option<number>`                                                            | Read a member's score as a number.                         |
+| `redis.zscoreToken`                | `ZSCORE`           | `Option<string>`                                                            | Read a member's score as the server's decimal text.        |
+| `redis.zmscore`                    | `ZMSCORE`          | `readonly Option<string>[]`                                                 | Read several scores as decimal text.                       |
+| `redis.zrank`                      | `ZRANK`            | `Option<bigint>`                                                            | Return a member's rank, lowest score first.                |
+| `redis.zrevrank`                   | `ZREVRANK`         | `Option<bigint>`                                                            | Return a member's rank, highest score first.               |
+| `redis.zrankWithScore`             | `ZRANK`            | `Option<readonly [bigint, string]>`                                         | Return a member's rank and score.                          |
+| `redis.zrevrankWithScore`          | `ZREVRANK`         | `Option<readonly [bigint, string]>`                                         | Return a member's reverse rank and score.                  |
+| `redis.zrange`                     | `ZRANGE`           | `readonly Uint8Array[]`                                                     | Read members by rank, score or lexicographic range.        |
+| `redis.zrangeWithScores`           | `ZRANGE`           | `readonly (readonly [Uint8Array, string])[]`                                | Read members and scores by rank or score range.            |
+| `redis.zrangestore`                | `ZRANGESTORE`      | `bigint`                                                                    | Store a range of members in another key.                   |
+| `redis.zrevrange`                  | `ZREVRANGE`        | `readonly Uint8Array[]`                                                     | Read members by rank, highest first (older form).          |
+| `redis.zrevrangeWithScores`        | `ZREVRANGE`        | `readonly (readonly [Uint8Array, string])[]`                                | Read members and scores by rank, highest first.            |
+| `redis.zrangebyscore`              | `ZRANGEBYSCORE`    | `readonly Uint8Array[]`                                                     | Read members by score range (older form).                  |
+| `redis.zrangebyscoreWithScores`    | `ZRANGEBYSCORE`    | `readonly (readonly [Uint8Array, string])[]`                                | Read members and scores by score range.                    |
+| `redis.zrevrangebyscore`           | `ZREVRANGEBYSCORE` | `readonly Uint8Array[]`                                                     | Read members by score range, highest first.                |
+| `redis.zrevrangebyscoreWithScores` | `ZREVRANGEBYSCORE` | `readonly (readonly [Uint8Array, string])[]`                                | Read members and scores by score range, highest first.     |
+| `redis.zrangebylex`                | `ZRANGEBYLEX`      | `readonly Uint8Array[]`                                                     | Read members by lexicographic range (older form).          |
+| `redis.zrevrangebylex`             | `ZREVRANGEBYLEX`   | `readonly Uint8Array[]`                                                     | Read members by lexicographic range, reversed.             |
+| `redis.zremrangebyrank`            | `ZREMRANGEBYRANK`  | `bigint`                                                                    | Remove members by rank range.                              |
+| `redis.zremrangebyscore`           | `ZREMRANGEBYSCORE` | `bigint`                                                                    | Remove members by score range.                             |
+| `redis.zremrangebylex`             | `ZREMRANGEBYLEX`   | `bigint`                                                                    | Remove members by lexicographic range.                     |
+| `redis.zpopmin`                    | `ZPOPMIN`          | `readonly (readonly [Uint8Array, string])[]`                                | Remove and return the lowest-scored members.               |
+| `redis.zpopmax`                    | `ZPOPMAX`          | `readonly (readonly [Uint8Array, string])[]`                                | Remove and return the highest-scored members.              |
+| `redis.zmpop`                      | `ZMPOP`            | `Option<readonly [Uint8Array, readonly (readonly [Uint8Array, string])[]]>` | Pop members from the first non-empty sorted set.           |
+| `redis.zrandmember`                | `ZRANDMEMBER`      | `Option<Uint8Array>`                                                        | Return one random member.                                  |
+| `redis.zrandmemberCount`           | `ZRANDMEMBER`      | `readonly Uint8Array[]`                                                     | Return several random members.                             |
+| `redis.zrandmemberWithScores`      | `ZRANDMEMBER`      | `readonly (readonly [Uint8Array, string])[]`                                | Return several random members with scores.                 |
+| `redis.zinter`                     | `ZINTER`           | `readonly Uint8Array[]`                                                     | Return the intersection of sorted sets.                    |
+| `redis.zinterWithScores`           | `ZINTER`           | `readonly (readonly [Uint8Array, string])[]`                                | Return the intersection with scores.                       |
+| `redis.zinterstore`                | `ZINTERSTORE`      | `bigint`                                                                    | Store the intersection in a key.                           |
+| `redis.zintercard`                 | `ZINTERCARD`       | `bigint`                                                                    | Count the intersection, with an optional limit.            |
+| `redis.zunion`                     | `ZUNION`           | `readonly Uint8Array[]`                                                     | Return the union of sorted sets.                           |
+| `redis.zunionWithScores`           | `ZUNION`           | `readonly (readonly [Uint8Array, string])[]`                                | Return the union with scores.                              |
+| `redis.zunionstore`                | `ZUNIONSTORE`      | `bigint`                                                                    | Store the union in a key.                                  |
+| `redis.zdiff`                      | `ZDIFF`            | `readonly Uint8Array[]`                                                     | Return the difference of sorted sets.                      |
+| `redis.zdiffWithScores`            | `ZDIFF`            | `readonly (readonly [Uint8Array, string])[]`                                | Return the difference with scores.                         |
+| `redis.zdiffstore`                 | `ZDIFFSTORE`       | `bigint`                                                                    | Store the difference in a key.                             |
+| `redis.zscan`                      | `ZSCAN`            | `ScanPage<readonly [Uint8Array, string]>`                                   | Read one cursor page of members and scores.                |
+| `redis.zscanMembers`               | `ZSCAN`            | `ScanPage<Uint8Array>`                                                      | Read one cursor page of members only (NOSCORES).           |
+
+## `SortedRange`
+
+`zrange`, `zrangeWithScores` and `zrangestore` take a `SortedRange`, a union tagged by `by`. `zrangeWithScores` takes `SortedRangeWithScores`, which excludes `by: "lex"`.
+
+<TypeTable
+  type={{
+    by: {
+      type: '"rank" | "score" | "lex"',
+      description: "What the range is measured in.",
+      required: true,
+    },
+    start: {
+      type: "number | bigint",
+      description: "First rank. Rank ranges only.",
+      required: false,
+    },
+    end: { type: "number | bigint", description: "Last rank. Rank ranges only.", required: false },
+    min: {
+      type: "ScoreBound | LexBound",
+      description: "Lower bound. Score and lex ranges only.",
+      required: false,
+    },
+    max: {
+      type: "ScoreBound | LexBound",
+      description: "Upper bound. Score and lex ranges only.",
+      required: false,
+    },
+    reverse: { type: "boolean", description: "Read from the highest end.", required: false },
+    limit: {
+      type: "{ offset: number | bigint; count: number | bigint }",
+      description: "Page the result. Score and lex ranges only.",
+      required: false,
+    },
+  }}
+/>
+
+- `Score` is `number | string`.
+- `ScoreBound` is a `Score` or `{ exclusive: Score }`.
+- `LexBound` is `"-"`, `"+"` or `{ value: RedisArgument; exclusive?: boolean }`.
+- `RangeLimit` is `{ offset; count }`.
+
+## `SortedAddOptions`
+
+`zadd` and `zaddIncrement` take `SortedAddOptions`. `zadd` takes `ScoredMembers`, a non-empty tuple of `[score, member]` pairs.
+
+<TypeTable
+  type={{
+    condition: {
+      type: '"NX" | "XX"',
+      description: "Add only new members (NX) or update only existing ones (XX).",
+      required: false,
+    },
+    comparison: {
+      type: '"GT" | "LT"',
+      description: "Update only if the new score is greater or lower.",
+      required: false,
+    },
+    changed: {
+      type: "boolean",
+      description: "Count changed members, not only new ones.",
+      required: false,
+    },
+  }}
+/>
+
+## `SortedAlgebraOptions`
+
+`zinter`, `zunion` and their store variants take `SortedAlgebraOptions`.
+
+<TypeTable
+  type={{
+    weights: {
+      type: "ReadonlyArray<number | string>",
+      description: "A weight for each input key.",
+      required: false,
+    },
+    aggregate: {
+      type: '"SUM" | "MIN" | "MAX" | "COUNT"',
+      description: "How scores combine.",
+      required: false,
+    },
+  }}
+/>
+
+## Blocking commands
+
+<Callout type="warn" title="Blocking commands need a session">
+  `redis.blpop` and the other blocking commands do not exist on `Redis`. They hold a connection
+  while they wait, so they live on `RedisSessions` and take `BlockingOptions`. See
+  [Sessions](/docs/redis/sessions).
+</Callout>
+
+| Method              | Command    | Reply type                                                                  | Purpose                                                                    |
+| ------------------- | ---------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `sessions.bzpopmin` | `BZPOPMIN` | `Option<readonly [Uint8Array, Uint8Array, string]>`                         | Pop the lowest-scored member, waiting if all sets are empty.               |
+| `sessions.bzpopmax` | `BZPOPMAX` | `Option<readonly [Uint8Array, Uint8Array, string]>`                         | Pop the highest-scored member, waiting if all sets are empty.              |
+| `sessions.bzmpop`   | `BZMPOP`   | `Option<readonly [Uint8Array, readonly (readonly [Uint8Array, string])[]]>` | Pop members from the first non-empty sorted set, waiting if all are empty. |
+
+`redis.zscan` takes a cursor and `ScanOptions` and returns a `ScanPage<readonly [Uint8Array, string]>`. `redis.zscanMembers` sends `NOSCORES`, which is a Valkey option, so other servers can return a `ServerError`. `redis.scanSortedSet` and `redis.scanSortedMembers` stream the whole set. See [Scanning](/docs/redis/scanning).

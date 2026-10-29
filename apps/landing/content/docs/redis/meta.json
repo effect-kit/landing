@@ -2,5 +2,23 @@
   "title": "Redis",
   "description": "Type-safe Redis client",
   "root": true,
-  "pages": ["index", "..."]
+  "pages": [
+    "index",
+    "---[rocket]Getting started---",
+    "...(start)",
+    "---[data]Working with data---",
+    "...(data)",
+    "---[messaging]Messaging---",
+    "...(messaging)",
+    "---[shield]Production---",
+    "...(production)",
+    "---[deploy]Deployment---",
+    "runtimes",
+    "cluster",
+    "sentinel",
+    "servers",
+    "---[reference]Reference---",
+    "...reference",
+    "commands"
+  ]
 }

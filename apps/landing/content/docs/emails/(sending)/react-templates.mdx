@@ -1,0 +1,60 @@
+---
+title: React templates
+description: Render a React Email component to HTML and plain text and send the result.
+---
+
+`EmailReact.render` turns a React element into the `html` and `text` of a message. It needs the [React peers](/docs/emails/installation) and does not use the `Email` service or any provider SDK.
+
+**Example** (Rendering a Component and Sending It)
+
+```tsx twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as EmailReact from "@effect-kit/emails/react";
+
+const Welcome = ({ name }: { name: string }) => <p>Hello {name}</p>;
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  const content = yield* EmailReact.render(<Welcome name="Ada" />);
+  //    ^?
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    ...content,
+  });
+});
+```
+
+The component renders once. The plain-text body is derived from that HTML.
+
+## Choosing the output
+
+`mode` selects what `render` returns, and the success type follows it.
+
+| `mode`                    | Success type     |
+| ------------------------- | ---------------- |
+| `"htmlAndText"` (default) | `{ html, text }` |
+| `"html"`                  | `{ html }`       |
+| `"text"`                  | `{ text }`       |
+
+**Example** (Rendering HTML Only)
+
+```tsx twoslash
+import { Effect } from "effect";
+import * as EmailReact from "@effect-kit/emails/react";
+
+const Welcome = ({ name }: { name: string }) => <p>Hello {name}</p>;
+
+const program = EmailReact.render(<Welcome name="Ada" />, { mode: "html" });
+//    ^?
+```
+
+## Errors
+
+`render` fails with `RenderError`, whose `reason` is `"InvalidElement"`, `"InvalidOptions"` or `"InvalidContent"`. `InvalidContent` means the output was blank. An exception thrown inside a component is a defect, not a typed error.
+
+## Trust
+
+Rendering does not sanitize HTML. Render only templates you wrote, and escape any untrusted value yourself. Interrupting the effect stops waiting for the render but cannot cancel it.

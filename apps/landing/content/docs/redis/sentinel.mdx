@@ -1,0 +1,208 @@
+---
+title: Sentinel
+description: Connect through Redis Sentinel so the client finds the current primary and follows failovers.
+keywords: [Sentinel, failover, high availability, primary, replica]
+---
+
+Redis Sentinel monitors a primary and its replicas and promotes a replica when the primary fails. `layerSentinel` asks the sentinels which node is the primary for a service name, connects to it, and checks that the node reports the primary role.
+
+**Example** (Connecting Through Sentinel)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const SentinelLive = RedisNode.layerSentinel({
+  serviceName: "mymaster",
+  sentinels: [
+    { endpoint: { host: "localhost", port: 26379 } },
+    { endpoint: { host: "localhost", port: 26380 } },
+  ],
+});
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.incr("visits");
+});
+
+export const runnable = program.pipe(Effect.provide(SentinelLive));
+```
+
+`RedisBun.layerSentinel` takes the same input, and `layerSentinelConfig` takes an Effect `Config` of it. Sentinel is not available over Upstash HTTP.
+
+## Describing the sentinels
+
+`sentinels` is a non-empty list. Each entry is a connection description such as `{ endpoint: { host, port } }`. The port defaults to `26379`. Sentinel endpoints must be TCP and use database `0`, otherwise the layer fails with `RedisConfigError`.
+
+`data` holds settings for the primary the client discovers: `database`, `protocol`, `tls`, limits and timeouts. You cannot give `data` an endpoint, because the endpoint is discovered.
+
+Sentinels and the data nodes can use different identities:
+
+- `credentials` and `credentialLifetime` authenticate to the primary and replicas.
+- `sentinelCredentials` and `sentinelCredentialLifetime` authenticate to the sentinels.
+
+See [Credentials](/docs/redis/credentials). A discovery authentication failure is `SentinelError` with `reason: "authentication"`, and `plane` tells you whether the sentinels or the data nodes rejected it.
+
+## Provided services
+
+The layer provides `Redis`, `RedisSentinel`, `CommandExecutor`, `BatchExecutor`, `RedisCredentials` and `RedisSentinelCredentials`.
+
+**Example** (The Services a Sentinel Layer Provides)
+
+```ts twoslash
+import type { Layer } from "effect";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const SentinelLive = RedisNode.layerSentinel({
+  serviceName: "mymaster",
+  sentinels: [{ endpoint: { host: "localhost" } }],
+});
+
+type Provided = Layer.Success<typeof SentinelLive>;
+//   ^?
+```
+
+`RedisSessions`, `RedisStreams`, `RedisScripts` and `RedisPubSub` are not provided. Reach them through `RedisSentinel`.
+
+## Using RedisSentinel
+
+`RedisSentinel` follows the current primary. It has `withSession`, `withBlockingSession`, `watch`, `scripts`, `streams`, `admin`, `pubsub` and `tracking`. Its `sentinel(index)` runs sentinel commands against one sentinel, and `topology` and `refresh` return the discovered view.
+
+**Example** (Reading the Current Primary and Replicas)
+
+```ts twoslash
+import { Effect } from "effect";
+import { RedisSentinel } from "@effect-kit/redis";
+
+export const view = Effect.gen(function* () {
+  const sentinel = yield* RedisSentinel;
+  const { primary, replicas } = yield* sentinel.topology;
+
+  return { primary, replicas: replicas.length };
+});
+```
+
+**Example** (Watching a Key Through Sentinel)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Commands, RedisSentinel } from "@effect-kit/redis";
+
+export const bump = Effect.gen(function* () {
+  const sentinel = yield* RedisSentinel;
+
+  return yield* sentinel.watch(["counter"], (session) =>
+    session.transaction([Commands.incr("counter")]),
+  );
+});
+```
+
+## Failover
+
+The client refreshes the primary every `refreshIntervalMillis`, and when a command shows the node is no longer the primary, for example a `READONLY` reply. After a promotion, new commands go to the new primary.
+
+What the client does with work that spans a failover:
+
+- A session lease taken before the failover fails. Work that depended on it, such as a `WATCH`, does not continue on the new primary.
+- An open Pub/Sub subscription fails with `SentinelError`, and so does a client-side cache read. Subscribe again after the failover.
+- A command whose reply was lost fails with `ConnectionError` and `delivery: "possibly-written"`. The client does not replay it on the new primary. See [Errors and retries](/docs/redis/errors).
+
+Sentinel failover is asynchronous, and a write that was acknowledged by the old primary can still be lost. That is Redis behavior, not something the client can detect.
+
+## Errors
+
+`SentinelError` has `delivery` (`unsent` or `replied`), `plane` (`sentinel` or `data`) and a `reason`:
+
+| `reason`           | Meaning                                               |
+| ------------------ | ----------------------------------------------------- |
+| `unreachable`      | No sentinel answered                                  |
+| `unknown-service`  | The sentinels do not know `serviceName`               |
+| `invalid-reply`    | A sentinel returned a reply the client cannot use     |
+| `role-mismatch`    | The discovered node does not report the expected role |
+| `authentication`   | A sentinel or data node rejected the credentials      |
+| `data-unavailable` | The primary was found but cannot be used              |
+| `capacity`         | Too many operations are waiting for discovery         |
+| `timeout`          | Discovery did not finish in `discoveryTimeoutMillis`  |
+| `closed`           | The client is closed                                  |
+| `topology-changed` | The primary changed while work was in progress        |
+| `routing`          | The command cannot be routed through Sentinel         |
+
+## Options
+
+Pass these as `sentinel` next to `serviceName` and `sentinels`.
+
+<TypeTable
+  type={{
+    discoveryAttempts: {
+      type: "number",
+      description: "Rounds of asking the sentinels for the primary. At most 10.",
+      default: "3",
+      required: false,
+    },
+    retryDelayMillis: {
+      type: "number",
+      description: "Wait between discovery rounds.",
+      default: "100",
+      required: false,
+    },
+    discoveryTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for a whole discovery.",
+      default: "5000",
+      required: false,
+    },
+    sentinelTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for one sentinel to answer.",
+      default: "500",
+      required: false,
+    },
+    refreshIntervalMillis: {
+      type: "number",
+      description: "Time between background refreshes of the primary.",
+      default: "30000",
+      required: false,
+    },
+    operationTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for one routed operation.",
+      default: "30000",
+      required: false,
+    },
+    maxSentinels: {
+      type: "number",
+      description: "Most sentinels the client keeps.",
+      default: "16",
+      required: false,
+    },
+    maxDataNodes: {
+      type: "number",
+      description: "Most data nodes the client keeps.",
+      default: "16",
+      required: false,
+    },
+    learnSentinels: {
+      type: "boolean",
+      description: "Add sentinels reported by the ones you listed, up to maxSentinels.",
+      default: "false",
+      required: false,
+    },
+    readPreference: {
+      type: '"primary" | "replica-preferred"',
+      description: "Where read-only commands go.",
+      default: '"primary"',
+      required: false,
+    },
+    dataTls: {
+      type: "TlsOptions",
+      description: "TLS settings for the discovered data nodes.",
+      required: false,
+    },
+    addressMap: {
+      type: "(address, plane) => { host: string; port: number; serverName?: string }",
+      description: "Translate addresses reported by the sentinels, for NAT or containers.",
+      required: false,
+    },
+  }}
+/>

@@ -1,0 +1,109 @@
+---
+title: Typed values
+description: Store and read application data through keys that carry a Schema codec.
+keywords: [Schema, JSON, PayloadCodec, RedisKey, getKey, setKey]
+---
+
+Redis stores bytes. A `RedisKey` pairs a key name with a codec, so `redis.setKey` and `redis.getKey` encode and decode values for you. Nothing is JSON-encoded unless you choose a JSON key.
+
+**Example** (Saving and Loading a Schema-Backed Key)
+
+```ts twoslash
+import { Effect, Schema } from "effect";
+
+import { Redis, RedisKey } from "@effect-kit/redis";
+
+const User = Schema.Struct({ name: Schema.String, active: Schema.Boolean });
+const userKey = RedisKey.json("user:42", User);
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.setKey(userKey, { name: "Ada", active: true });
+
+  const user = yield* redis.getKey(userKey);
+  //    ^?
+
+  return user;
+});
+```
+
+`RedisKey.json` stores the value as a JSON string and decodes it with the Schema. `getKey` returns `Option<A>` for the Schema's type, and `setKey` accepts that same type. A decode failure is a `PayloadError`, which appears in the error type next to `RedisError`.
+
+<Callout type="idea" title="Prefer Schema-backed keys">
+  A key with a Schema keeps the shape of stored data in one place. Plain `get` and `set` return and
+  take strings, with no check on what is inside.
+</Callout>
+
+## Building keys
+
+| Constructor                         | Value type          | Stored as                    |
+| ----------------------------------- | ------------------- | ---------------------------- |
+| `RedisKey.text(name)`               | `string`            | UTF-8 text                   |
+| `RedisKey.json(name, schema)`       | the Schema's `Type` | JSON string                  |
+| `RedisKey.schemaText(name, schema)` | the Schema's `Type` | the Schema's string encoding |
+| `RedisKey.make(name, codec)`        | the codec's type    | whatever the codec writes    |
+
+`schemaText` takes a Schema whose encoded side is `string`.
+
+**Example** (Storing a Number as Text)
+
+```ts twoslash
+import { Effect, Schema } from "effect";
+
+import { Redis, RedisKey } from "@effect-kit/redis";
+
+const retries = RedisKey.schemaText("jobs:retries", Schema.NumberFromString);
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.setKey(retries, 3);
+
+  const stored = yield* redis.getKey(retries);
+  //    ^?
+  const raw = yield* redis.get("jobs:retries");
+  //    ^?
+
+  return { stored, raw };
+});
+```
+
+Decoding is strict UTF-8. Bytes that are not valid UTF-8 fail with a `PayloadError` whose `stage` is `"decode"`.
+
+## Writing a codec
+
+A `PayloadCodec<A>` is a pair of functions: `encode` returns `Uint8Array` and `decode` takes one. `PayloadCodec.text`, `PayloadCodec.schemaText(schema)` and `PayloadCodec.json(schema)` cover the common cases. `RedisKey.make` attaches any codec to a key name.
+
+**Example** (Keeping a Key's Codec Next to Its Name)
+
+```ts twoslash
+import { Effect, Schema } from "effect";
+
+import { PayloadCodec, Redis, RedisKey } from "@effect-kit/redis";
+
+const Session = Schema.Struct({ userId: Schema.String, expires: Schema.Number });
+const sessionKey = (id: string) => RedisKey.make(`session:${id}`, PayloadCodec.json(Session));
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.setKey(
+    sessionKey("a1"),
+    { userId: "42", expires: 1893456000 },
+    {
+      expiry: { type: "EX", value: 3600 },
+    },
+  );
+
+  return yield* redis.getKey(sessionKey("a1"));
+});
+```
+
+`setKey` takes the same options as `set`, except `get`. A Schema that needs services puts those services in the Effect requirements, so the program must provide them.
+
+## Reading bytes
+
+`redis.getBytes` returns `Option<Uint8Array>` and does no decoding. Use it for binary values. Missing keys are `None`, and an empty value is `Some` of an empty array.
+
+Hash, list and set members come back as `Uint8Array` unless a text variant exists, such as `redis.hgetText`.

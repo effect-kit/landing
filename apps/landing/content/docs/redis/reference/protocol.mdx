@@ -1,0 +1,87 @@
+---
+title: RESP2 and RESP3
+description: Look up how the client negotiates the Redis protocol, how it falls back, and how replies are normalized.
+keywords: [HELLO, RESP3, protocol, RespValue]
+---
+
+The client speaks the Redis wire protocol itself. It can use RESP3 or RESP2, and the commands, option types and reply types are the same under both. The `protocol` option chooses what the connection asks for.
+
+## The `protocol` option
+
+| Value     | Behavior                                                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `"auto"`  | Send `HELLO 3`. If the server answers that it does not know `HELLO` or the protocol version, continue on RESP2. Any other rejection fails the connection. This is the default. |
+| `"resp3"` | Send `HELLO 3`. Any rejection fails the connection. There is no fallback.                                                                                                      |
+| `"resp2"` | Do not send `HELLO`. The connection stays on RESP2.                                                                                                                            |
+
+**Example** (Pinning a Protocol)
+
+```ts twoslash
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const Resp2 = RedisNode.layer({ url: "redis://localhost:6379", protocol: "resp2" });
+```
+
+`HELLO 3` is sent after authentication and before `CLIENT SETNAME` and `SELECT`. The fallback in `auto` applies only to two rejections: `NOPROTO unsupported protocol version` and `ERR unknown command 'HELLO'`. A connection that is rejected for another reason fails with a `HandshakeError` with `stage: "hello"`. If the server accepts `HELLO 3` but does not report protocol 3, the connection also fails with `stage: "hello"`.
+
+The negotiated protocol is `ConnectionSnapshot.protocol`, which is `"resp2"`, `"resp3"` or `undefined` before the handshake completes. Upstash HTTP has no `protocol` option.
+
+## What changes between the two
+
+Nothing in the API. The reply decoders accept both shapes and return one type:
+
+- Members (`smembers`, `sinter`) decode from a RESP3 set or a RESP2 array into `readonly Uint8Array[]`.
+- Field and value pairs (`hgetall`) decode from a RESP3 map, a RESP2 flat array or an array of pairs into an ordered array of tuples. Binary keys and duplicate keys are kept, and nothing becomes a JavaScript object.
+- Scores decode from a RESP3 double or a RESP2 bulk string into the server's decimal text, or a number for `zscore`.
+- A missing value is `None`. RESP2 uses a nil bulk string or a nil array and RESP3 uses a null. A nil array is not a missing scalar: an empty pop such as `lpopCount` on a missing list is `None`, and a missing string is `None` too, each through its own decoder.
+- Attribute replies are unwrapped before decoding.
+
+## `RespValue`
+
+Replies are decoded into a lossless `RespValue` first and then into a typed value. `redis.raw` returns the `RespValue` without decoding it. Error replies from `raw` arrive as values of `_tag: "SimpleError"` or `"BlobError"` and do not fail the Effect.
+
+| `_tag`           | Fields                                    | Protocol                                 |
+| ---------------- | ----------------------------------------- | ---------------------------------------- |
+| `SimpleString`   | `value: Uint8Array`                       | RESP2, RESP3                             |
+| `BlobString`     | `value: Uint8Array`                       | RESP2, RESP3                             |
+| `SimpleError`    | `value: Uint8Array`                       | RESP2, RESP3                             |
+| `BlobError`      | `value: Uint8Array`                       | RESP3                                    |
+| `Integer`        | `value: bigint`                           | RESP2, RESP3                             |
+| `BigNumber`      | `value: bigint`                           | RESP3                                    |
+| `Double`         | `value: string`                           | RESP3                                    |
+| `Boolean`        | `value: boolean`                          | RESP3                                    |
+| `Null`           | `kind: "resp3" \| "bulk" \| "array"`      | RESP2 (`bulk`, `array`), RESP3 (`resp3`) |
+| `VerbatimString` | `format: Uint8Array`, `value: Uint8Array` | RESP3                                    |
+| `Array`          | `values: ReadonlyArray<RespValue>`        | RESP2, RESP3                             |
+| `Map`            | `entries: RespPairs`                      | RESP3                                    |
+| `Set`            | `values: ReadonlyArray<RespValue>`        | RESP3                                    |
+| `Push`           | `values: ReadonlyArray<RespValue>`        | RESP3                                    |
+| `Attribute`      | `entries: RespPairs`, `value: RespValue`  | RESP3                                    |
+
+`RespPairs` is `ReadonlyArray<readonly [RespValue, RespValue]>`. Doubles stay as text so no precision is lost.
+
+**Example** (Inspecting a Raw Reply)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+import type { RawContract } from "@effect-kit/redis";
+
+const contract: RawContract = { execution: "ordinary", routing: { _tag: "Keyless" } };
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const reply = yield* redis.raw(["ECHO", "hello"], contract);
+  //    ^?
+
+  return reply._tag;
+});
+```
+
+## Low-level codec
+
+`encodeCommand(tokens, limits?)` returns a `Result` with the RESP frame or a `ProtocolError`. `makeRespDecoder(limits?)` returns a `Result` with a `RespDecoder` that you `feed` bytes, drain with `next`, and close with `end`. The decode limits are `maxHeaderBytes`, `maxBlobBytes`, `maxBufferedBytes`, `maxAggregateEntries` and `maxNestingDepth`, set through [`limits`](/docs/redis/reference/configuration#limits). A frame that breaks the grammar or a limit fails with a [`ProtocolError`](/docs/redis/reference/errors#protocolerror).
+
+Replication and RDB framing and streamed RESP3 aggregates are outside the ordinary command API.

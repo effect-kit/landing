@@ -1,0 +1,89 @@
+---
+title: Overview
+description: Find which service and page covers each command family, and how a method name maps to a command and reply.
+---
+
+This reference lists the commands that ship with `@effect-kit/redis`: the method on its service, the Redis command it sends and the success type it returns. Each family page also has the option types that family uses. The tables are written by hand for now and list only methods that exist in the published types.
+
+| Family                                          | Service                  | Covers                                           |
+| ----------------------------------------------- | ------------------------ | ------------------------------------------------ |
+| [Strings](/docs/redis/commands/strings)         | `Redis`                  | `get`, `set`, counters, ranges, multi-key writes |
+| [Hashes](/docs/redis/commands/hashes)           | `Redis`                  | Fields, increments, field expiry                 |
+| [Lists](/docs/redis/commands/lists)             | `Redis`, `RedisSessions` | Push, pop, move, blocking pops                   |
+| [Sets](/docs/redis/commands/sets)               | `Redis`                  | Members, set algebra                             |
+| [Sorted sets](/docs/redis/commands/sorted-sets) | `Redis`, `RedisSessions` | Scores, ranges, algebra, blocking pops           |
+| [Keys and expiry](/docs/redis/commands/keys)    | `Redis`                  | Delete, rename, copy, sort, expiry, scan         |
+| [Geo](/docs/redis/commands/geo)                 | `Redis`                  | Coordinates and radius or box search             |
+| [Bitmaps](/docs/redis/commands/bitmaps)         | `Redis`                  | Bits and bitfields                               |
+| [HyperLogLog](/docs/redis/commands/hyperloglog) | `Redis`                  | Approximate distinct counts                      |
+| [Streams](/docs/redis/commands/streams)         | `Redis`, `RedisSessions` | Entries, consumer groups, reads                  |
+| [Pub/Sub](/docs/redis/commands/pubsub)          | `Redis`, `RedisPubSub`   | Publish, inspect, subscribe                      |
+| [Scripting](/docs/redis/commands/scripting)     | `Redis`, `RedisScripts`  | Lua scripts and functions                        |
+| [Administration](/docs/redis/commands/admin)    | `RedisAdmin`             | Server, ACL, config, clients, diagnostics        |
+
+Commands for JSON, Search, TimeSeries, probabilistic structures and vector sets are also methods on `Redis`. They are covered in [Modules](/docs/redis/servers/modules).
+
+## How a method maps to a command
+
+A method name is the Redis command in lowercase, so `redis.zadd` sends `ZADD`. Subcommands are joined in camel case: `objectEncoding` sends `OBJECT ENCODING`, `xgroupCreate` sends `XGROUP CREATE`, and `scriptLoad` sends `SCRIPT LOAD`.
+
+A suffix means the same command with a different reply shape or form:
+
+- `WithScores`, `WithValues` and `With` add the details to each element: `zrange` and `zrangeWithScores`.
+- `Count` returns several elements where the plain method returns one: `lpop` and `lpopCount`.
+- `Bytes` and `Text` choose the representation: `get` returns text and `getBytes` returns bytes.
+- `Ro` is the read-only form: `sortRo`, `georadiusRo`.
+- `Store` writes the result to a key instead of returning it.
+
+Each command method has a pure `Commands.*` value with the same name. Pass it to `redis.execute`, [`redis.pipeline`](/docs/redis/pipelines) or [`redis.transaction`](/docs/redis/transactions). See [Commands](/docs/redis/running-commands).
+
+**Example** (One Command Written Two Ways)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const viaMethod = yield* redis.zcard("scores");
+  //    ^?
+  const viaValue = yield* redis.execute(Commands.zcard("scores"));
+  //    ^?
+
+  return [viaMethod, viaValue] as const;
+});
+```
+
+## How a reply maps to a type
+
+The success type depends on what the command returns. Errors are in the error channel, and a missing key is a value, not an error.
+
+| Redis reply               | Type                                             | Example                                  |
+| ------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| Integer count or length   | `bigint`                                         | `hlen`, `llen`, `del`, `xlen`            |
+| Integer flag (0 or 1)     | `boolean`                                        | `sismember`, `hexists`, `expire`         |
+| Bit                       | `0 \| 1`                                         | `getbit`, `setbit`                       |
+| Simple string `OK`        | `void`                                           | `mset`, `rename`, `ltrim`                |
+| Nil or value              | `Option<A>`                                      | `get`, `lpop`, `zrank`                   |
+| Bulk string               | `Uint8Array`                                     | `getrange`, `lcs`                        |
+| Array                     | `readonly A[]`                                   | `lrange`, `smembers`                     |
+| Field and value pairs     | `readonly (readonly [Uint8Array, Uint8Array])[]` | `hgetall`                                |
+| Score or decimal          | `string` (decimal text)                          | `zincrby`, `incrbyfloat`, `hincrbyfloat` |
+| Cursor page               | `ScanPage<A>`                                    | `scan`, `hscan`, `sscan`, `zscan`        |
+| Script or function result | `A` from the decoder you pass                    | `evalScript`, `fcall`                    |
+
+Stored values come back as `Uint8Array`, except `get`, `hgetText` and typed keys, which decode UTF-8 text. Nothing is JSON-encoded unless you ask. See [Typed values](/docs/redis/typed-values).
+
+Some `Redis` methods run commands rather than being one command:
+
+| Method                            | Purpose                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `redis.execute(command)`          | Run any `Command` value.                                                      |
+| `redis.executePrepared(prepared)` | Run a `PreparedCommand`.                                                      |
+| `redis.pipeline(commands)`        | Send commands in one round trip. See [Pipelines](/docs/redis/pipelines).      |
+| `redis.transaction(commands)`     | Run commands in `MULTI`/`EXEC`. See [Transactions](/docs/redis/transactions). |
+| `redis.raw(tokens, contract)`     | Send raw tokens and get a `RespValue`.                                        |
+
+Blocking commands, `WATCH`, subscriptions and `MONITOR` are not on `Redis` because they hold a connection. They are on `RedisSessions`, `RedisPubSub` and `RedisMonitor`. See [Sessions](/docs/redis/sessions).

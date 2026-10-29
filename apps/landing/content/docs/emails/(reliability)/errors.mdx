@@ -1,0 +1,156 @@
+---
+title: Errors and retries
+description: Handle an EmailError by reason, read acceptance to know if a send is safe to repeat, and retry on your own terms.
+keywords: ["retry", "acceptance", "EmailError", "rate limit"]
+---
+
+`email.send` fails with an `EmailError`. Its `reason` says what went wrong, and its `acceptance` says whether the provider may already have the message. The package never retries for you.
+
+**Example** (Handling a Rate Limit by Reason)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const send = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+const handled = send.pipe(
+  //    ^?
+  Effect.catchReason("EmailError", "RateLimitedError", (reason) =>
+    Effect.succeed(reason.retryAfter),
+  ),
+);
+```
+
+`Effect.catchReason` unwraps the nested reason. Reasons you do not handle stay in the error channel as `EmailError`.
+
+## Reading an `EmailError`
+
+Every failure carries the same fields. Only `reason` varies by case.
+
+| Field          | Type                                        | Meaning                                                  |
+| -------------- | ------------------------------------------- | -------------------------------------------------------- |
+| `provider`     | `string`                                    | Provider name, such as `resend` or `ses`.                |
+| `operation`    | `"send"`                                    | The only operation.                                      |
+| `acceptance`   | `"notSubmitted" \| "rejected" \| "unknown"` | What is known about submission.                          |
+| `reason`       | tagged union                                | The cause, with its own fields.                          |
+| `statusCode`   | `number` (optional)                         | HTTP status from the provider, 100 to 599.               |
+| `providerCode` | `string` (optional)                         | A provider code, kept only if the package recognizes it. |
+| `references`   | `SubmissionReference[]` (optional)          | Provider identifiers, when the failure carries any.      |
+
+**Example** (Listing Every Reason)
+
+```ts twoslash
+import type { EmailError } from "@effect-kit/emails";
+
+type ReasonTag = EmailError["reason"]["_tag"];
+//   ^?
+```
+
+The reasons most code handles:
+
+| Reason                     | Handle it by                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------- |
+| `InvalidMessageError`      | Fixing the message. `paths` lists the offending fields.                                         |
+| `UnsupportedFeatureError`  | Dropping the field or choosing another provider. See [Capabilities](/docs/emails/capabilities). |
+| `AuthenticationError`      | Checking the credential.                                                                        |
+| `RateLimitedError`         | Waiting. `retryAfter` is a hint when the provider sends one.                                    |
+| `RecipientRejectedError`   | Removing the recipients in `recipients`, each a `{ role, index }`.                              |
+| `IdempotencyConflictError` | Treating the key as already used. See [Idempotency](/docs/emails/idempotency).                  |
+
+The full list, with every field, is in [Errors](/docs/emails/reference/errors).
+
+## What `acceptance` says
+
+`acceptance` is the field that decides whether a failed send can be repeated.
+
+**Example** (Reading the Three Values)
+
+```ts twoslash
+import type { EmailError } from "@effect-kit/emails";
+
+type Acceptance = EmailError["acceptance"];
+//   ^?
+```
+
+| Value          | Meaning                                     | Set when                                                                           |
+| -------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `notSubmitted` | Nothing was sent to the provider.           | The message failed validation, a capability check, or an adapter pre-flight check. |
+| `rejected`     | The provider refused the submission.        | The provider answered with an HTTP 4xx status other than 409.                      |
+| `unknown`      | The provider may have accepted the message. | Everything else: 409, 5xx, timeouts, transport errors, an unreadable response.     |
+
+The package sees acceptance only. It never sees delivery, so there is no "delivered" or "bounced" value.
+
+## Retrying
+
+The package makes no retry and has no failover. The SES client is built with `maxAttempts: 1` and the Nodemailer transport with `maxRequeues: 0`, so neither SDK retries. A client you pass to `layerClient` keeps its own retry policy.
+
+Retry yourself, and decide by `acceptance`:
+
+- `notSubmitted` and `rejected`: the provider has no copy of the message, so a repeat cannot duplicate it. It helps only when the cause can change, such as a rate limit.
+- `unknown`: the first attempt may have gone through.
+
+**Example** (Retrying Only a Rate Limit That Was Refused)
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const send = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+const withRetry = send.pipe(
+  //    ^?
+  Effect.retry({
+    times: 3,
+    schedule: Schedule.exponential("500 millis"),
+    while: (error) => error.acceptance === "rejected" && error.reason._tag === "RateLimitedError",
+  }),
+);
+```
+
+To honor the provider's wait, read `retryAfter`. `RateLimitedError`, `QuotaExceededError` and `ProviderUnavailableError` may carry it as a `Duration`.
+
+**Example** (Waiting for retryAfter Once)
+
+```ts
+import { Duration, Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const send = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+const sendAfterLimit = send.pipe(
+  Effect.catchReason("EmailError", "RateLimitedError", (reason) =>
+    Effect.sleep(reason.retryAfter ?? Duration.seconds(5)).pipe(Effect.andThen(send)),
+  ),
+);
+```
+
+<Callout type="error" title="Do not retry unknown blindly">
+  When `acceptance` is `"unknown"`, the provider may have the message already, and a second send
+  delivers it twice. Pass an `idempotencyKey` on a provider that supports one, or check with the
+  provider before you resend. See [Idempotency](/docs/emails/idempotency).
+</Callout>

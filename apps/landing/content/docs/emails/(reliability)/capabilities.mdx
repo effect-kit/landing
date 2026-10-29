@@ -1,0 +1,108 @@
+---
+title: Capabilities
+description: Inspect what a provider supports and understand the checks that run before any request is sent.
+keywords: ["UnsupportedFeatureError", "feature support", "reply-to"]
+---
+
+Each provider layer declares what it can send. `email.send` compares your message against those capabilities before it calls the provider, so an unsupported field fails with no network request.
+
+**Example** (Failing Before the Request)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as MailerSend from "@effect-kit/emails/mailersend";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "billing@example.com",
+    to: "ada@example.com",
+    subject: "Invoice",
+    text: "Your invoice is attached.",
+    attachments: [
+      {
+        filename: "invoice.pdf",
+        contentType: "application/pdf",
+        content: new Uint8Array([37, 80, 68, 70]),
+      },
+    ],
+  });
+}).pipe(
+  Effect.catchReason("EmailError", "UnsupportedFeatureError", (reason) =>
+    Effect.succeed(`unsupported: ${reason.feature}`),
+  ),
+  Effect.provide(MailerSend.layerConfig()),
+);
+// Output: "unsupported: attachments"
+```
+
+The failure is an `EmailError` with `acceptance: "notSubmitted"` and an `UnsupportedFeatureError` reason. Its `feature` names the first check that failed.
+
+## Reading capabilities
+
+The service exposes `email.provider` and `email.capabilities`. Read them to adapt a message before sending.
+
+**Example** (Passing a Key Only When Supported)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const send = Effect.gen(function* () {
+  const email = yield* Email;
+  const { idempotency } = email.capabilities;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Welcome",
+      text: "Your account is ready.",
+    },
+    idempotency.mode === "unsupported" ? {} : { idempotencyKey: "welcome/account-123" },
+  );
+});
+```
+
+`EmailCapabilities` has eleven fields.
+
+| Field               | Type                               | Meaning                                                                  |
+| ------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `text`              | `boolean`                          | Accepts a `text` body.                                                   |
+| `html`              | `boolean`                          | Accepts an `html` body.                                                  |
+| `htmlAndText`       | `boolean`                          | Accepts both bodies in one message.                                      |
+| `senderName`        | `boolean`                          | Accepts a display name on `from`.                                        |
+| `cc`                | `boolean`                          | Accepts `cc`.                                                            |
+| `bcc`               | `boolean`                          | Accepts `bcc`.                                                           |
+| `replyTo`           | `"none" \| "single" \| "multiple"` | How many reply-to addresses are allowed.                                 |
+| `headers`           | `boolean`                          | Accepts custom headers.                                                  |
+| `attachments`       | `boolean`                          | Accepts attachments.                                                     |
+| `inlineAttachments` | `boolean`                          | Accepts attachments with a `contentId`.                                  |
+| `idempotency`       | `{ mode }`                         | `"unsupported"`, `"replay"` or `"reject"`, with an optional `retention`. |
+
+The per-provider values are in the [capability matrix](/docs/emails/providers) and in [Capabilities reference](/docs/emails/reference/capabilities).
+
+## Check order
+
+The core runs the checks in this order and reports the first failure. Only one feature is named per attempt, so fixing one field can surface the next.
+
+| Order | `feature`           | Fails when                                                     |
+| ----- | ------------------- | -------------------------------------------------------------- |
+| 1     | `text`              | `text` is set and the provider has no text bodies.             |
+| 2     | `html`              | `html` is set and the provider has no HTML bodies.             |
+| 3     | `htmlAndText`       | Both are set and the provider cannot take both.                |
+| 4     | `senderName`        | `from` has a `name`.                                           |
+| 5     | `cc`                | `cc` is set.                                                   |
+| 6     | `bcc`               | `bcc` is set.                                                  |
+| 7     | `replyTo`           | `replyTo` is set and `replyTo` is `"none"`.                    |
+| 8     | `multipleReplyTo`   | More than one reply-to address and `replyTo` is `"single"`.    |
+| 9     | `headers`           | Any custom header is set.                                      |
+| 10    | `attachments`       | Any attachment is set.                                         |
+| 11    | `inlineAttachments` | An attachment has a `contentId`.                               |
+| 12    | `idempotency`       | An `idempotencyKey` is passed and the mode is `"unsupported"`. |
+
+<Callout type="info" title="Provider checks come after">
+  Some providers also reject a field for reasons that are not capability flags, such as a malformed
+  idempotency key or an inline `contentId` that Lettermint needs to contain `@`. Those fail with
+  `InvalidMessageError`, still with `acceptance: "notSubmitted"`.
+</Callout>

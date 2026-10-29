@@ -1,0 +1,29 @@
+---
+title: Overview
+description: Compare what each of the 16 providers supports before you pick one.
+---
+
+Each provider has its own subpath, `@effect-kit/emails/<name>`, and provides the same `Email` service. The matrix shows what each one accepts. A message that uses a feature the provider lacks fails with `UnsupportedFeatureError` before any request.
+
+| Provider                                                                  | Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency        |
+| ------------------------------------------------------------------------- | ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ------------------ |
+| [Resend](/docs/emails/providers/resend)                                   | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | replay, 24 hours   |
+| [Amazon SES](/docs/emails/providers/ses)                                  | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no                 |
+| [Postmark](/docs/emails/providers/postmark)                               | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no                 |
+| [SendGrid](/docs/emails/providers/sendgrid)                               | yes  | yes  | yes  | yes         | yes | yes | one      | yes     | yes         | yes           | no                 |
+| [Mailgun](/docs/emails/providers/mailgun)                                 | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | no            | no                 |
+| [SMTP (Nodemailer)](/docs/emails/providers/nodemailer)                    | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no                 |
+| [Brevo](/docs/emails/providers/brevo)                                     | yes  | yes  | yes  | yes         | yes | yes | one      | yes     | no          | no            | reject, 30 minutes |
+| [MailerSend](/docs/emails/providers/mailersend)                           | yes  | yes  | yes  | yes         | yes | yes | one      | yes     | no          | no            | no                 |
+| [Mailtrap](/docs/emails/providers/mailtrap)                               | yes  | yes  | yes  | yes         | yes | yes | one      | yes     | yes         | yes           | no                 |
+| [Mailchimp Transactional](/docs/emails/providers/mailchimp-transactional) | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | no            | no                 |
+| [Azure Communication Services](/docs/emails/providers/azure)              | yes  | yes  | yes  | no          | yes | yes | multiple | yes     | yes         | yes           | no                 |
+| [ZeptoMail](/docs/emails/providers/zeptomail)                             | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no                 |
+| [Scaleway](/docs/emails/providers/scaleway)                               | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | no            | no                 |
+| [Lettermint](/docs/emails/providers/lettermint)                           | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | replay, 24 hours   |
+| [Plunk](/docs/emails/providers/plunk)                                     | no   | yes  | no   | yes         | no  | no  | none     | no      | no          | no            | no                 |
+| [eusend](/docs/emails/providers/eusend)                                   | yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | replay             |
+
+Pick by the features your messages need: attachments and inline images, how many reply-to addresses, a sender name, and whether you need an idempotency key. Only Resend, Lettermint, eusend and Brevo support idempotency keys.
+
+[Plunk](/docs/emails/providers/plunk) is HTML only with one recipient, and [Azure](/docs/emails/providers/azure) takes no sender name. Read the same flags at runtime from `email.capabilities`, described in [Capabilities](/docs/emails/capabilities).

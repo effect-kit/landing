@@ -1,0 +1,130 @@
+---
+title: Commands
+description: Call commands as methods on the Redis service, as pure values, or as raw tokens.
+keywords: [execute, defineCommand, raw, Reply]
+---
+
+Every Redis command is available three ways: as a method on `redis`, as a pure `Commands.*` value you pass to `redis.execute`, or as raw tokens through `redis.raw`. All three go through the same executor and fail with the same typed errors. Per-family method lists are in the [Commands reference](/docs/redis/commands).
+
+**Example** (Calling a Command as a Method and as a Value)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const viaMethod = yield* redis.get("user:42:name");
+  //    ^?
+  const viaValue = yield* redis.execute(Commands.get("user:42:name"));
+  //    ^?
+
+  return [viaMethod, viaValue] as const;
+});
+```
+
+`redis.get("k")` and `redis.execute(Commands.get("k"))` are the same call. A `Commands.*` value does nothing until something runs it, so you can build commands ahead of time and hand them to [`redis.pipeline`](/docs/redis/pipelines), [`redis.transaction`](/docs/redis/transactions) or `redis.execute`.
+
+## How results are typed
+
+The success type follows the command and its options.
+
+- `redis.get` returns `Option<string>` and `redis.getBytes` returns `Option<Uint8Array>`.
+- Integer replies such as `incr`, `hset`, `zadd` and `del` return `bigint`.
+- Keys and values accept `string` or `Uint8Array`.
+- `redis.set` returns `void`. With a literal `condition` it returns `boolean`. With `{ get: true }` it returns the previous value as `Option<Uint8Array>`.
+
+**Example** (Typing a Conditional Write)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const created = yield* redis.set("lock:report", "worker-1", { condition: "NX" });
+  //    ^?
+
+  const previous = yield* redis.set("mode", "fast", { get: true });
+  //    ^?
+
+  return { created, previous };
+});
+```
+
+`created` is `true` when the key was set and `false` when `NX` found it already present. Previous bytes do not prove that a condition applied.
+
+`expiryAfter(Duration)` builds an expiry from an Effect `Duration`. It rejects durations below one millisecond.
+
+## Defining a command
+
+`defineCommand` builds a `Command` from metadata, tokens, routing and a reply decoder. Use it for a command the package does not ship, such as one from a server module.
+
+The `Reply` namespace has the decoders: `blob`, `text`, `integer`, `safeInteger`, `status`, `optional`, `array`, `score`, `boolean`, `nullable`, `pairs` and more. A decoder that gets an unexpected shape fails with a `ReplyError`.
+
+**Example** (Defining a Command With an Integer Reply)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis, Reply, defineCommand } from "@effect-kit/redis";
+import type { CommandMetadata } from "@effect-kit/redis";
+
+const metadata: CommandMetadata = {
+  name: "CUSTOM.COUNT",
+  family: "custom",
+  execution: "ordinary",
+  replay: "never",
+  provenance: [{ source: "https://example.com/custom-module", revision: "1.0.0" }],
+  scenarios: ["custom-count"],
+  availability: [],
+};
+
+const customCount = (key: string) =>
+  defineCommand({
+    metadata,
+    tokens: ["CUSTOM.COUNT", key],
+    routing: { _tag: "Keys", keys: [{ index: 1, access: "read" }] },
+    decode: Reply.integer,
+  });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const visits = yield* redis.execute(customCount("visits"));
+  //    ^?
+
+  return visits;
+});
+```
+
+`routing` tells a cluster client which arguments are keys. Use `{ _tag: "Keyless" }` for a command with no key. `replay` is always `"never"`: no command is sent again after a possible write.
+
+## Raw commands
+
+`redis.raw` sends tokens as they are and returns the reply as a `RespValue`. You must pass a contract with the `execution` mode and `routing`. Without it the call does not compile.
+
+**Example** (Sending Raw Tokens)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const contract = { execution: "ordinary", routing: { _tag: "Keyless" } } as const;
+
+  const reply = yield* redis.raw(["ECHO", "hello"], contract);
+  //    ^?
+
+  return reply._tag === "BlobString" ? new TextDecoder().decode(reply.value) : undefined;
+});
+```
+
+Raw commands keep server errors as values. An error reply arrives as a `RespValue` with `_tag: "SimpleError"` and does not fail the Effect.

@@ -1,0 +1,97 @@
+---
+title: Errors
+description: Every error the Emails package can fail with, its tag, fields and when it occurs.
+---
+
+All errors are tagged classes, so `_tag` equals the class name. `email.send` fails with `EmailError`, `Email.sendMany` with `BatchError`, `EmailReact.render` with `RenderError`, and layer construction with a configuration error.
+
+## `EmailError`
+
+The only expected error of `email.send`. Its `message` is `Email submission: <reason tag>`.
+
+| Field          | Type                                        | Description                                                    |
+| -------------- | ------------------------------------------- | -------------------------------------------------------------- |
+| `provider`     | `string`                                    | Provider name of the service that failed.                      |
+| `operation`    | `"send"`                                    | The only operation.                                            |
+| `acceptance`   | `"notSubmitted" \| "rejected" \| "unknown"` | What is known about submission.                                |
+| `reason`       | `EmailErrorReason`                          | One of the reasons below.                                      |
+| `statusCode`   | `number` (optional)                         | HTTP status, 100 to 599.                                       |
+| `providerCode` | `string` (optional)                         | A provider code from a reviewed list. Other codes are dropped. |
+| `references`   | `SubmissionReference[]` (optional)          | Provider identifiers, when the failure carries any.            |
+
+Handle a reason with `Effect.catchReason("EmailError", "<ReasonTag>", handler)`.
+
+### `acceptance`
+
+| Value          | Set when                                                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `notSubmitted` | Decoding fails (`InvalidMessageError`), a capability check fails (`UnsupportedFeatureError`), or an adapter pre-flight check fails.      |
+| `rejected`     | The default for an HTTP 4xx status other than 409.                                                                                       |
+| `unknown`      | The default for everything else: 409, 5xx, timeouts, transport errors, an unreadable response. Also set when the core rejects a receipt. |
+
+Adapters can override the default for a specific failure. A repeated Resend key, for example, reports `unknown` even though the status is 4xx.
+
+### Reasons
+
+| Reason                     | Extra fields  | Default status mapping |
+| -------------------------- | ------------- | ---------------------- |
+| `InvalidMessageError`      | `paths`       | 400, 422               |
+| `UnsupportedFeatureError`  | `feature`     | none                   |
+| `AuthenticationError`      | none          | 401                    |
+| `PermissionDeniedError`    | none          | 403                    |
+| `RateLimitedError`         | `retryAfter?` | 429                    |
+| `QuotaExceededError`       | `retryAfter?` | none                   |
+| `RecipientRejectedError`   | `recipients`  | none                   |
+| `MessageRejectedError`     | none          | none                   |
+| `IdempotencyConflictError` | none          | none                   |
+| `TransportError`           | none          | none                   |
+| `TimeoutError`             | none          | none                   |
+| `ProviderUnavailableError` | `retryAfter?` | 5xx                    |
+| `UnexpectedResponseError`  | none          | none                   |
+| `ProviderError`            | none          | any other status       |
+
+The mapping column is the default applied when an adapter gives only a status. Adapters map provider-specific codes to more precise reasons.
+
+- `paths` is an array of field paths. Each segment is a field name, an integer index, or `"*"` for an unknown key.
+- `retryAfter` is a `Duration`, a hint only.
+- `recipients` is an array of `{ role: "to" | "cc" | "bcc", index: number }`.
+- `feature` is an `EmailFeature`.
+
+### `EmailFeature`
+
+`text`, `html`, `htmlAndText`, `senderName`, `cc`, `bcc`, `replyTo`, `multipleReplyTo`, `headers`, `attachments`, `inlineAttachments`, `idempotency`. The order in which they are checked is in [Capabilities](/docs/emails/capabilities#check-order).
+
+## `BatchError`
+
+Fails `Email.sendMany` before any send. It has one field, `reason`.
+
+| `reason`          | Meaning                                                               |
+| ----------------- | --------------------------------------------------------------------- |
+| `InvalidRequests` | `requests` is not an array or has more than 1,000 entries.            |
+| `InvalidOptions`  | `BatchOptions` is invalid, such as a `concurrency` outside 1 to 1000. |
+
+Failures of individual messages are not a `BatchError`. They are returned as results.
+
+## `RenderError`
+
+Fails `render` from `@effect-kit/emails/react`. It has one field, `reason`. An exception thrown by your component is a defect, not a `RenderError`.
+
+| `reason`         | Meaning                                    |
+| ---------------- | ------------------------------------------ |
+| `InvalidElement` | The first argument is not a React element. |
+| `InvalidOptions` | The options are invalid.                   |
+| `InvalidContent` | The rendered HTML or text is blank.        |
+
+## Configuration errors
+
+Layer construction (`layer`, `layerClient`, `layerConfig`) fails with a configuration error when an option is invalid. `layerConfig` can also fail with `Config.ConfigError` when an environment variable is missing or malformed.
+
+| Error                          | Providers        | `field` values                                          |
+| ------------------------------ | ---------------- | ------------------------------------------------------- |
+| `ResendConfigurationError`     | `resend`         | `apiKey`, `baseUrl`, `timeout`                          |
+| `NodemailerConfigurationError` | `nodemailer`     | `transport`, `timeout`, `retries`                       |
+| `SesConfigurationError`        | `ses`            | `region`, `timeout`, `endpoint`, `configurationSetName` |
+| `AzureConfigurationError`      | `azure`          | `connectionString`, `timeout`, `pollInterval`           |
+| `ProviderConfigurationError`   | The other twelve | `field` is a string. The error also carries `provider`. |
+
+Each class is exported from its provider subpath.

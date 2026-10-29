@@ -1,0 +1,21 @@
+{
+  "title": "Commands",
+  "icon": "commands",
+  "defaultOpen": false,
+  "pages": [
+    "index",
+    "strings",
+    "hashes",
+    "lists",
+    "sets",
+    "sorted-sets",
+    "keys",
+    "geo",
+    "bitmaps",
+    "hyperloglog",
+    "streams",
+    "pubsub",
+    "scripting",
+    "admin"
+  ]
+}

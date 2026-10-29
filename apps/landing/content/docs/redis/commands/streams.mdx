@@ -1,0 +1,152 @@
+---
+title: Streams
+description: Look up the stream commands, consumer group commands and read option types.
+---
+
+Stream commands append entries to a log and read them back by ID or through consumer groups. These are the single-command forms. For continuous readers and acknowledged processing, use [`RedisStreams`](/docs/redis/streams).
+
+**Example** (Appending and Reading Entries)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const id = yield* redis.xadd("orders", "*", [
+    //  ^?
+    ["sku", "A-100"],
+    ["qty", "2"],
+  ]);
+
+  const batch = yield* redis.xread([["orders", "0"]], { count: 10 });
+  //    ^?
+
+  return { id, batch };
+});
+```
+
+`xadd` returns the new entry ID as a `${bigint}-${bigint}` template literal type. `xread` returns `None` when no stream has new entries.
+
+## Methods
+
+| Method                       | Command                 | Reply type                                         | Purpose                                                         |
+| ---------------------------- | ----------------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| `redis.xadd`                 | `XADD`                  | `` `${bigint}-${bigint}` ``                        | Append an entry and return its ID.                              |
+| `redis.xaddIfExists`         | `XADD`                  | ``Option<`${bigint}-${bigint}`>``                  | Append an entry only if the stream exists (NOMKSTREAM).         |
+| `redis.xaddPayload`          | `XADD`                  | `` `${bigint}-${bigint}` ``                        | Append a single-field entry encoded with a StreamPayload codec. |
+| `redis.xlen`                 | `XLEN`                  | `bigint`                                           | Return the number of entries.                                   |
+| `redis.xrange`               | `XRANGE`                | `readonly StreamEntry[]`                           | Read entries between two IDs.                                   |
+| `redis.xrevrange`            | `XREVRANGE`             | `readonly StreamEntry[]`                           | Read entries between two IDs, newest first.                     |
+| `redis.xdel`                 | `XDEL`                  | `bigint`                                           | Delete entries by ID.                                           |
+| `redis.xdelex`               | `XDELEX`                | `readonly (1n \| -1n \| 2n)[]`                     | Delete entries by ID with a reference policy.                   |
+| `redis.xtrim`                | `XTRIM`                 | `bigint`                                           | Trim a stream by length or minimum ID.                          |
+| `redis.xcfgset`              | `XCFGSET`               | `void`                                             | Set stream idempotency options.                                 |
+| `redis.xread`                | `XREAD`                 | `Option<readonly StreamRead<StreamEntry>[]>`       | Read new entries without blocking.                              |
+| `redis.xreadgroup`           | `XREADGROUP`            | `Option<readonly StreamRead<GroupEntry>[]>`        | Read entries for a consumer group without blocking.             |
+| `redis.xreadgroupClaim`      | `XREADGROUP`            | `Option<readonly StreamRead<ClaimedGroupEntry>[]>` | Read for a consumer group and claim idle entries.               |
+| `redis.xack`                 | `XACK`                  | `bigint`                                           | Acknowledge entries for a group.                                |
+| `redis.xackdel`              | `XACKDEL`               | `readonly (1n \| -1n \| 2n)[]`                     | Acknowledge entries and delete them under a reference policy.   |
+| `redis.xnack`                | `XNACK`                 | `bigint`                                           | Negatively acknowledge entries for a group.                     |
+| `redis.xgroupCreate`         | `XGROUP CREATE`         | `void`                                             | Create a consumer group.                                        |
+| `redis.xgroupSetid`          | `XGROUP SETID`          | `void`                                             | Move a group's last delivered ID.                               |
+| `redis.xgroupDestroy`        | `XGROUP DESTROY`        | `boolean`                                          | Delete a consumer group.                                        |
+| `redis.xgroupCreateconsumer` | `XGROUP CREATECONSUMER` | `boolean`                                          | Create a consumer in a group.                                   |
+| `redis.xgroupDelconsumer`    | `XGROUP DELCONSUMER`    | `bigint`                                           | Delete a consumer and return its pending count.                 |
+| `redis.xgroupHelp`           | `XGROUP HELP`           | `readonly string[]`                                | Return the XGROUP help text.                                    |
+| `redis.xpending`             | `XPENDING`              | `PendingSummary`                                   | Summarize a group's pending entries.                            |
+| `redis.xpendingEntries`      | `XPENDING`              | `readonly PendingEntry[]`                          | List pending entries with owner and idle time.                  |
+| `redis.xclaim`               | `XCLAIM`                | `readonly Option<GroupEntry>[]`                    | Claim pending entries for a consumer.                           |
+| `redis.xclaimIds`            | `XCLAIM`                | ``readonly `${bigint}-${bigint}`[]``               | Claim pending entries and return only their IDs.                |
+| `redis.xautoclaim`           | `XAUTOCLAIM`            | `ClaimPage<Option<GroupEntry>>`                    | Claim idle pending entries from a start ID.                     |
+| `redis.xautoclaimIds`        | `XAUTOCLAIM`            | ``ClaimPage<`${bigint}-${bigint}`>``               | Claim idle entries and return only their IDs.                   |
+| `redis.xinfoStream`          | `XINFO STREAM`          | `StreamInfo`                                       | Return stream statistics.                                       |
+| `redis.xinfoStreamFull`      | `XINFO STREAM`          | `StreamInfoFull`                                   | Return full stream, group and consumer detail (FULL).           |
+| `redis.xinfoGroups`          | `XINFO GROUPS`          | `readonly StreamGroupInfo[]`                       | List consumer groups.                                           |
+| `redis.xinfoConsumers`       | `XINFO CONSUMERS`       | `readonly StreamConsumerInfo[]`                    | List a group's consumers.                                       |
+| `redis.xinfoHelp`            | `XINFO HELP`            | `readonly string[]`                                | Return the XINFO help text.                                     |
+
+## Blocking reads
+
+<Callout type="warn" title="Blocking commands need a session">
+  `redis.blpop` and the other blocking commands do not exist on `Redis`. They hold a connection
+  while they wait, so they live on `RedisSessions` and take `BlockingOptions`. See
+  [Sessions](/docs/redis/sessions).
+</Callout>
+
+`redis.xread` and `redis.xreadgroup` accept `StreamReadOptions` without `block`. Reads that wait are on `RedisSessions` and take `BlockingReadOptions` or `BlockingGroupOptions`, which require `block`.
+
+| Method                             | Command      | Reply type                                         | Purpose                                                                |
+| ---------------------------------- | ------------ | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| `sessions.xreadBlocking`           | `XREAD`      | `Option<readonly StreamRead<StreamEntry>[]>`       | Read new entries, waiting up to the block time.                        |
+| `sessions.xreadgroupBlocking`      | `XREADGROUP` | `Option<readonly StreamRead<GroupEntry>[]>`        | Read for a consumer group, waiting up to the block time.               |
+| `sessions.xreadgroupClaimBlocking` | `XREADGROUP` | `Option<readonly StreamRead<ClaimedGroupEntry>[]>` | Read for a group and claim idle entries, waiting up to the block time. |
+
+## `StreamReadOptions`
+
+`xread` takes `ReadStreams`, a non-empty tuple of `[key, ReadId]`. `xreadgroup` takes a group, a consumer and `GroupReadStreams`, a non-empty tuple of `[key, GroupReadId]`. `ReadId` is a `StreamPosition`, `"$"` or `"+"`. `GroupReadId` is a `StreamPosition` or `">"`.
+
+<TypeTable
+  type={{
+    count: { type: "number | bigint", description: "Maximum entries per stream.", required: false },
+    maxCount: {
+      type: "number | bigint",
+      description: "Sent as MAXCOUNT. It must not be lower than count.",
+      required: false,
+    },
+    maxSize: { type: "number | bigint", description: "Sent as MAXSIZE.", required: false },
+    block: {
+      type: "BlockingOptions",
+      description: "Wait for entries. Only on RedisSessions methods.",
+      required: false,
+    },
+  }}
+/>
+
+`GroupReadOptions` has the same fields plus `noAck?: boolean`.
+
+## `StreamAddOptions`
+
+`xadd` and `xaddIfExists` take an ID of the form `"*"`, `"<ms>-*"` or `"<ms>-<seq>"` (`AddId`), a non-empty tuple of `[field, value]` pairs (`StreamFieldInput`), and `StreamAddOptions`.
+
+<TypeTable
+  type={{
+    trim: {
+      type: '{ by: "MAXLEN"; threshold; approximate?; limit? } | { by: "MINID"; threshold; approximate?; limit? }',
+      description: "Trim the stream while appending. This is a StreamTrim.",
+      required: false,
+    },
+    references: {
+      type: '"KEEPREF" | "DELREF" | "ACKED"',
+      description: "How trimming treats consumer group references.",
+      required: false,
+    },
+    idempotency: {
+      type: '{ mode: "IDMPAUTO"; producer } | { mode: "IDMP"; producer; id }',
+      description: "Make the append idempotent for a producer.",
+      required: false,
+    },
+  }}
+/>
+
+## Group and claim options
+
+- `GroupCreateOptions` for `xgroupCreate`: `{ mkstream?: boolean; entriesRead?: number | bigint }`. `GroupSetIdOptions` for `xgroupSetid` is the same without `mkstream`. `GroupStart` is a `StreamPosition` or `"$"`.
+- `PendingOptions` for `xpendingEntries`: `{ start; end; count; idleMillis?; consumer? }`.
+- `ClaimOptions` for `xclaim`: `{ deliveryTime?: { type: "IDLE" | "TIME"; millis }; retryCount?; force?; lastId? }`.
+- `AutoClaimOptions` for `xautoclaim`: `{ count? }`.
+- `StreamNackOptions` for `xnack`: `{ retryCount?; force? }`. The `mode` argument is `"SILENT" | "FAIL" | "FATAL"`.
+- `StreamRangeOptions` for `xrange`: `{ count? }`. `StreamConfigOptions` for `xcfgset`: `{ idmpDurationSeconds?; idmpMaxSize? }`.
+- `StreamTrim` for `xtrim` and `ReferencePolicy` as above. `StreamIds` is a non-empty tuple of `StreamId`.
+
+## Reply types
+
+- `StreamEntry` is `{ id: StreamId; fields: ReadonlyArray<readonly [Uint8Array, Uint8Array]> }`.
+- `GroupEntry` is the same but `fields` is an `Option`, because a pending entry can outlive its payload.
+- `ClaimedGroupEntry` adds `idleMillis` and `deliveries`.
+- `StreamRead<A>` is `{ key: Uint8Array; entries: ReadonlyArray<A> }`.
+- `PendingSummary` is `{ count; smallest; largest; consumers }`. `PendingEntry` is `{ id; consumer; idleMillis; deliveries }`.
+- `ClaimPage<A>` is `{ cursor; entries; deleted }`.
+- `StreamInfo`, `StreamInfoFull`, `StreamGroupInfo` and `StreamConsumerInfo` are the `XINFO` replies.

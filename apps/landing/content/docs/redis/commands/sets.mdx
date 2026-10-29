@@ -1,0 +1,70 @@
+---
+title: Sets
+description: Look up the set commands, including set algebra, with their commands and reply types.
+---
+
+Set commands store unique members. Members are bytes, and membership checks return `boolean`.
+
+**Example** (Tracking Unique Visitors)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const added = yield* redis.sadd("visitors:mon", ["ada", "grace", "linus"]);
+  //    ^?
+  const seen = yield* redis.sismember("visitors:mon", "ada");
+  //    ^?
+  const both = yield* redis.sinter(["visitors:mon", "visitors:tue"]);
+  //    ^?
+
+  return { added, seen, both };
+});
+```
+
+## Methods
+
+| Method                   | Command       | Reply type              | Purpose                                                 |
+| ------------------------ | ------------- | ----------------------- | ------------------------------------------------------- |
+| `redis.sadd`             | `SADD`        | `bigint`                | Add members and return how many were new.               |
+| `redis.srem`             | `SREM`        | `bigint`                | Remove members and return how many were removed.        |
+| `redis.scard`            | `SCARD`       | `bigint`                | Count the members.                                      |
+| `redis.smembers`         | `SMEMBERS`    | `readonly Uint8Array[]` | List every member.                                      |
+| `redis.sismember`        | `SISMEMBER`   | `boolean`               | Check whether a value is a member.                      |
+| `redis.smismember`       | `SMISMEMBER`  | `readonly boolean[]`    | Check several values at once.                           |
+| `redis.spop`             | `SPOP`        | `Option<Uint8Array>`    | Remove and return one random member.                    |
+| `redis.spopCount`        | `SPOP`        | `readonly Uint8Array[]` | Remove and return several random members.               |
+| `redis.srandmember`      | `SRANDMEMBER` | `Option<Uint8Array>`    | Return one random member.                               |
+| `redis.srandmemberCount` | `SRANDMEMBER` | `readonly Uint8Array[]` | Return several random members.                          |
+| `redis.smove`            | `SMOVE`       | `boolean`               | Move a member from one set to another.                  |
+| `redis.sdiff`            | `SDIFF`       | `readonly Uint8Array[]` | Return the difference of sets.                          |
+| `redis.sinter`           | `SINTER`      | `readonly Uint8Array[]` | Return the intersection of sets.                        |
+| `redis.sunion`           | `SUNION`      | `readonly Uint8Array[]` | Return the union of sets.                               |
+| `redis.sdiffstore`       | `SDIFFSTORE`  | `bigint`                | Store the difference of sets in a key.                  |
+| `redis.sinterstore`      | `SINTERSTORE` | `bigint`                | Store the intersection of sets in a key.                |
+| `redis.sunionstore`      | `SUNIONSTORE` | `bigint`                | Store the union of sets in a key.                       |
+| `redis.sdiffcard`        | `SDIFFCARD`   | `bigint`                | Count the difference of sets.                           |
+| `redis.sintercard`       | `SINTERCARD`  | `bigint`                | Count the intersection of sets, with an optional limit. |
+| `redis.sunioncard`       | `SUNIONCARD`  | `bigint`                | Count the union of sets.                                |
+| `redis.sscan`            | `SSCAN`       | `ScanPage<Uint8Array>`  | Read one cursor page of members.                        |
+
+## `SetCardinalityOptions`
+
+`sdiffcard` and `sintercard` take `{ limit?: number | bigint }`. `sunioncard` also accepts `approximate`.
+
+<TypeTable
+  type={{
+    limit: {
+      type: "number | bigint",
+      description: "Stop counting at this value.",
+      required: false,
+    },
+    approximate: { type: "boolean", description: "Accepted by sunioncard only.", required: false },
+  }}
+/>
+
+`redis.sscan` takes a cursor and `ScanOptions` and returns a `ScanPage<Uint8Array>`. `redis.scanSet` streams the whole set. See [Scanning](/docs/redis/scanning).

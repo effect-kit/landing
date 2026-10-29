@@ -1,0 +1,113 @@
+---
+title: Configuration
+description: Build a provider Layer from environment variables, explicit options, or an SDK client you own.
+---
+
+Every provider subpath exports three Layer constructors with the same shape. Each provides the `Email` service, so you can change the constructor or the provider without changing the code that sends.
+
+| Constructor   | Input                                      | Who owns the SDK client                           |
+| ------------- | ------------------------------------------ | ------------------------------------------------- |
+| `layerConfig` | An Effect `Config` of the provider options | The Layer creates it and closes it with the scope |
+| `layer`       | Resolved options                           | The Layer creates it and closes it with the scope |
+| `layerClient` | An SDK client you built                    | You. The Layer never closes it                    |
+
+## Reading options from the environment
+
+`layerConfig` resolves a `Config` into options. Called with no argument, it reads the provider's standard environment variables, for example `RESEND_API_KEY` for Resend.
+
+**Example** (Reading the Resend Key From the Environment)
+
+```ts twoslash
+import { ConfigProvider, Layer } from "effect";
+import * as Resend from "@effect-kit/emails/resend";
+
+const EmailLive = Resend.layerConfig().pipe(
+  //    ^?
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+```
+
+The `ConfigProvider` layer is what reads `process.env`. Loading a `.env` file is up to your application.
+
+Every provider's `layerConfig` has a default `Config` except Mailtrap, which needs an explicit one because it has no default.
+
+**Example** (Passing an Explicit Config to Mailtrap)
+
+```ts
+import { Config, ConfigProvider, Layer } from "effect";
+import * as Mailtrap from "@effect-kit/emails/mailtrap";
+
+const EmailLive = Mailtrap.layerConfig(
+  Config.all({
+    token: Config.Redacted("MAILTRAP_TOKEN"),
+    mode: Config.succeed("production" as const),
+  }),
+).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())));
+```
+
+## Passing options directly
+
+`layer` takes resolved options. Secrets are `Redacted` values, which stay hidden when the options are logged.
+
+**Example** (Building the Resend Layer With Options)
+
+```ts twoslash
+import { Duration, Redacted } from "effect";
+import * as Resend from "@effect-kit/emails/resend";
+
+const EmailLive = Resend.layer({
+  apiKey: Redacted.make("re_fake_key"),
+  timeout: Duration.seconds(10),
+});
+```
+
+A `Redacted` secret must be printable ASCII with no spaces. A value that is not fails Layer construction with a configuration error naming the field.
+
+## Using your own client
+
+`layerClient` borrows a client you created and never closes it. The client keeps its own retry, timeout and logging policy.
+
+**Example** (Borrowing a Resend Client)
+
+```ts
+import { Resend as ResendSdk } from "resend";
+import * as Resend from "@effect-kit/emails/resend";
+
+const client = new ResendSdk("re_fake_key");
+
+const EmailLive = Resend.layerClient(client);
+```
+
+The same seam works in tests: pass any object that has the methods the Layer calls. For Resend that is `emails.send`.
+
+## Options
+
+Options differ per provider. Resend is the worked example.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. layerConfig reads RESEND_API_KEY.",
+      required: true,
+    },
+    baseUrl: {
+      type: "URL",
+      description: "API origin. Must be http or https with no credentials, query or fragment.",
+      default: '"https://api.resend.com"',
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description: "Time allowed for one send. Must be finite and positive.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+`timeout` also exists on the other providers. Its default is 30 seconds, except Azure, which polls a long-running operation and defaults to 60 seconds. A value that is not finite and positive fails with a configuration error whose `field` is `"timeout"`.
+
+## Configuration errors
+
+Layer construction can fail with a `Config.ConfigError` when a variable is missing, or with a provider configuration error such as `ResendConfigurationError`, whose `field` names the bad option. Handle both where you build the Layer, at the edge of your program.

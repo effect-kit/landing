@@ -1,0 +1,143 @@
+---
+title: Plunk
+description: "Send email through Plunk with the @effect-kit/emails/plunk Layer."
+---
+
+The `@effect-kit/emails/plunk` subpath sends messages through [Plunk](https://docs.useplunk.com) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @plunk/node@3.0.3
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Plunk.layerConfig()` reads these variables:
+
+| Variable        | Required | Value                               |
+| --------------- | -------- | ----------------------------------- |
+| `PLUNK_API_KEY` | yes      | Secret API key, starting with `sk_` |
+
+**Example** (Sending a Message With Plunk)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Plunk from "@effect-kit/emails/plunk";
+
+const EmailLive = Plunk.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    html: "<p>Your account is ready.</p>",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Plunk account is allowed to send from.
+
+## Options
+
+`Plunk.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The secret API key. Must be printable ASCII with no spaces and start with sk_.",
+      required: true,
+    },
+    baseUrl: {
+      type: "URL",
+      description:
+        "API base URL. Must be http or https with no credentials, query or fragment, and its path must end with a slash.",
+      default: "https://next-api.useplunk.com/v1/",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Plunk reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| no   | yes  | no   | yes         | no  | no  | none     | no      | no          | no            | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- A `text` body (feature `text`).
+- A `cc` list (feature `cc`).
+- A `bcc` list (feature `bcc`).
+- Any `replyTo` address (feature `replyTo`).
+- Any custom header (feature `headers`).
+- Any attachment (feature `attachments`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- Plunk is HTML only. A message needs `html` and exactly one `to` address without a name. A text-only message fails the capability check, and a message without `html` or with a named or second recipient fails with `InvalidMessageError` (path `to`).
+- Only `from`, the sender name, `to`, `subject` and the HTML body are sent. Anything else fails the capability check first: `text`, `cc`, `bcc`, `replyTo`, headers and attachments.
+- The `@plunk/node` package is marked as no longer supported on npm. Pin it to the version above.
+- A send is accepted when Plunk reports the recipient as `queued`. The status `throttled` or `skipped` fails with `MessageRejectedError`. The receipt's single reference is the recipient address.
+
+## Using your own client
+
+`layerClient` takes any object with `emails.send({ to, from, name, subject, body })`, which a `Plunk` client has. `options` is optional.
+
+**Example** (Borrowing a Plunk Client)
+
+```ts
+import Plunk from "@plunk/node";
+import * as PlunkEmail from "@effect-kit/emails/plunk";
+
+const client = new Plunk("sk_fake_key");
+
+const EmailLive = PlunkEmail.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "plunk"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------ |
+| `timeout` | The timeout is not finite and positive.                                                                      |
+| `token`   | The key is not printable ASCII without spaces.                                                               |
+| `apiKey`  | The key does not start with `sk_`.                                                                           |
+| `baseUrl` | The URL is not http or https, has credentials, a query or a fragment, or its path does not end with a slash. |
+
+| Plunk failure                             | Reason                                                       |
+| ----------------------------------------- | ------------------------------------------------------------ |
+| SDK token error                           | `AuthenticationError` (status 401, `acceptance: "rejected"`) |
+| SDK not found error                       | `ProviderError` (status 404)                                 |
+| A plain `Error` from the SDK              | `ProviderError`                                              |
+| Recipient status `throttled` or `skipped` | `MessageRejectedError` (`acceptance: "rejected"`)            |
+| Any other status except `queued`          | `UnexpectedResponseError`                                    |
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors). A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`.

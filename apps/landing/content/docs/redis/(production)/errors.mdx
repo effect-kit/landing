@@ -1,0 +1,147 @@
+---
+title: Errors and retries
+description: Handle typed Redis failures and decide what is safe to retry from the delivery field.
+keywords: [retry, idempotent, delivery, possibly-written]
+---
+
+Commands fail with tagged errors in the error channel. Most of them carry a **`delivery`** field that says how far the command got before it failed.
+
+**Example** (The Error Type of a Command)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("greeting");
+});
+
+type Failure = Effect.Error<typeof program>;
+//   ^?
+```
+
+The error type is `RedisError`: a union of tagged errors, each with a `_tag` you can match on. Connection setup errors surface when the layer is built, not on a command.
+
+## What does `delivery` mean?
+
+`delivery` has four values.
+
+| Value              | Meaning                                                         | Where it appears  |
+| ------------------ | --------------------------------------------------------------- | ----------------- |
+| `unsent`           | Nothing was written for this command.                           | Native and HTTP   |
+| `possibly-written` | The command may have reached the server, and no reply was read. | Native only       |
+| `replied`          | The server answered.                                            | Native and HTTP   |
+| `unknown`          | The request may have reached the server, and no reply was read. | Upstash HTTP only |
+
+`possibly-written` and `unknown` mean the same thing on different transports. Both leave the command in doubt: it can have run once, or not at all.
+
+| Error                                                                                              | `delivery`                                |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `CommandInputError`, `AdmissionError`, `HandshakeError`, `UnsupportedCommandError`, `ProfileError` | `unsent`                                  |
+| `ConnectionError`                                                                                  | `unsent` or `possibly-written`            |
+| `SessionError`                                                                                     | `unsent`, `replied` or `possibly-written` |
+| `ClusterError`, `SentinelError`                                                                    | `unsent` or `replied`                     |
+| `ServerError`, `ReplyError`                                                                        | `replied`                                 |
+| `UpstashError`                                                                                     | `unsent`, `unknown` or `replied`          |
+
+`ProtocolError` has no `delivery` field. Malformed framing retires the connection it came from. The [error reference](/docs/redis/reference/errors) lists every field and reason.
+
+## Handling errors by tag
+
+Match a tag with `Effect.catchTag`. A `ServerError` carries the server's error code, and its reply text is redacted because it can contain application data.
+
+**Example** (Treating a Wrong Type as a Missing Value)
+
+```ts twoslash
+import { Effect, Option } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+const readName = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("user:42:name");
+}).pipe(
+  Effect.catchTag("ServerError", (error) =>
+    error.code === "WRONGTYPE" ? Effect.succeed(Option.none<string>()) : Effect.fail(error),
+  ),
+);
+```
+
+`ServerError` and `ReplyError` have `delivery: "replied"`. The command reached the server and got an answer, so there is nothing in doubt.
+
+## What the package retries
+
+The package retries only things it can prove are safe. It never replays a command.
+
+| Source                                 | What it retries                                                                               | Limit                                                                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Opening a connection                   | A `TransportError` while opening, except `reason: "limit"`. A `HandshakeError` is not retried | `connection.reconnectAttempts` (default `3`), waiting `reconnectDelayMillis * 2^attempt` (default `100` ms), capped at 60000 ms |
+| Cluster redirects                      | A command the server answered with `MOVED` or `ASK`, sent to the node it names                | `cluster.maxRedirects` (default `8`), then `ClusterError` with `reason: "redirect-limit"`                                       |
+| Lua scripts                            | An `EVALSHA` the server rejected with `NOSCRIPT`, after loading the script                    | Once. A second rejection is returned as is                                                                                      |
+| Pub/Sub with `recovery: "resubscribe"` | Restoring subscriptions after a `TransportError` or `ConnectionError`                         | `subscriptions.reconnectAttempts` (default `3`), spaced by `reconnectDelayMillis` (default `100` ms)                            |
+| Sentinel discovery                     | Asking the sentinels for the primary                                                          | `sentinel.discoveryAttempts` (default `3`), spaced by `retryDelayMillis` (default `100` ms)                                     |
+
+The first is connection setup, not a command. The next two re-send a command only after the server replied that it did not run it.
+
+Everything else is yours to retry. In particular, no command is retried after a write that may have reached the server:
+
+- A `ConnectionError` with `delivery: "possibly-written"` is returned to you as is. Interrupting a command after it was written retires that connection, and cannot undo the mutation.
+- The Upstash HTTP layer retries nothing. A `429` response becomes `UpstashError` with `reason: "rate-limit"` and, when the server sent a `Retry-After` header, `retryAfterSeconds`.
+- A Sentinel failover does not replay a command whose outcome is uncertain.
+
+<Callout type="error" title="No retry after a possible write">
+  A command that failed with `possibly-written` or `unknown` may have run. Retrying `INCR` or
+  `LPUSH` blindly can apply it twice.
+</Callout>
+
+## Retrying a command that never reached the server
+
+`delivery: "unsent"` means nothing was written, so a retry cannot duplicate the command. Retry with `Effect.retry` and a `while` predicate on the error.
+
+**Example** (Retrying a Write That Was Never Sent)
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+const increment = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.incr("visits");
+}).pipe(
+  Effect.retry({
+    schedule: Schedule.spaced("200 millis"),
+    times: 3,
+    while: (error) => error._tag === "ConnectionError" && error.delivery === "unsent",
+  }),
+);
+```
+
+Other `unsent` errors, such as `CommandInputError`, fail the same way every time. Restrict the predicate to errors where waiting helps: `ConnectionError`, and `AdmissionError` with `reason: "count"` or `"bytes"`, which mean the command queue is full.
+
+## Retrying an idempotent command
+
+You know which commands are safe to run twice. A read is, and so is `SET` with a fixed value. For these, retry on `possibly-written` too.
+
+**Example** (Retrying a Read After an Uncertain Failure)
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+const readGreeting = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.get("greeting");
+}).pipe(
+  Effect.retry({
+    schedule: Schedule.spaced("200 millis"),
+    times: 3,
+    while: (error) => error._tag === "ConnectionError",
+  }),
+);
+```
+
+For a non-idempotent command, read the state back before deciding. After a `possibly-written` `INCR`, `GET` the counter and compare, or design the write so a second run changes nothing.
+
+## Pipelines and transactions
+
+A pipeline returns one `Result` per command, so one failure does not hide the others. If the whole batch fails, `BatchError` carries redacted per-command `outcomes`, and its `execution` field (`"partial-or-unknown"`, `"not-executed"`, `"unknown"` or `"replied"`) says whether any command may have run. `TransactionError` has `execution: "not-executed"` or `"unknown"` for the same purpose. See [Pipelines](/docs/redis/pipelines) and [Transactions](/docs/redis/transactions).

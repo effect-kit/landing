@@ -1,0 +1,87 @@
+---
+title: Scripting
+description: Look up the Lua script and function commands, RedisScripts and the script option types.
+---
+
+Scripting commands run Lua on the server, either as scripts you send by source or digest, or as functions in loaded libraries. You declare the keys yourself, because the client cannot infer them from Lua source.
+
+**Example** (Running a Script With a Typed Reply)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { RedisScript, RedisScripts, Reply } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const scripts = yield* RedisScripts;
+
+  const bump = yield* RedisScript.make({
+    source: "return redis.call('INCRBY', KEYS[1], ARGV[1])",
+    decode: Reply.integer,
+  });
+
+  const total = yield* scripts.execute(bump, { keys: ["counter"], args: ["5"] });
+  //    ^?
+
+  return total;
+});
+```
+
+`RedisScript.make` computes the SHA-1 digest, so it needs `Crypto`. The native `RedisNode` and `RedisBun` layers provide it. `RedisScripts.execute` runs the script by digest and loads it first if the server does not have it. The [Lua scripts guide](/docs/redis/scripts) covers loading and routing.
+
+## Methods on `Redis`
+
+`evalScript`, `evalSha`, `evalReadOnly`, `evalShaReadOnly`, `fcall` and `fcallReadOnly` take the source, digest or function name, a `ScriptArguments` value and a reply decoder from the `Reply` namespace. The reply type `A` is whatever the decoder returns.
+
+| Method                  | Command            | Reply type                                               | Purpose                                            |
+| ----------------------- | ------------------ | -------------------------------------------------------- | -------------------------------------------------- |
+| `redis.evalScript`      | `EVAL`             | `A`                                                      | Run Lua source with declared keys and arguments.   |
+| `redis.evalSha`         | `EVALSHA`          | `A`                                                      | Run a cached script by SHA-1 digest.               |
+| `redis.evalReadOnly`    | `EVAL_RO`          | `A`                                                      | Run Lua source that must not write.                |
+| `redis.evalShaReadOnly` | `EVALSHA_RO`       | `A`                                                      | Run a cached script by digest that must not write. |
+| `redis.fcall`           | `FCALL`            | `A`                                                      | Call a loaded function.                            |
+| `redis.fcallReadOnly`   | `FCALL_RO`         | `A`                                                      | Call a function that must not write.               |
+| `redis.scriptLoad`      | `SCRIPT LOAD`      | `string`                                                 | Load a script and return its SHA-1 digest.         |
+| `redis.scriptExists`    | `SCRIPT EXISTS`    | `readonly boolean[]`                                     | Check which digests are cached.                    |
+| `redis.scriptFlush`     | `SCRIPT FLUSH`     | `void`                                                   | Clear the script cache.                            |
+| `redis.scriptShow`      | `SCRIPT SHOW`      | `Uint8Array`                                             | Return the source of a cached script by digest.    |
+| `redis.scriptKill`      | `SCRIPT KILL`      | `void`                                                   | Stop a running read-only script.                   |
+| `redis.scriptHelp`      | `SCRIPT HELP`      | `readonly string[]`                                      | Return the SCRIPT help text.                       |
+| `redis.functionLoad`    | `FUNCTION LOAD`    | `string`                                                 | Load a function library and return its name.       |
+| `redis.functionList`    | `FUNCTION LIST`    | `readonly (readonly (readonly [string, RespValue])[])[]` | List function libraries.                           |
+| `redis.functionDelete`  | `FUNCTION DELETE`  | `void`                                                   | Delete a library.                                  |
+| `redis.functionDump`    | `FUNCTION DUMP`    | `Uint8Array`                                             | Serialize all libraries.                           |
+| `redis.functionRestore` | `FUNCTION RESTORE` | `void`                                                   | Restore libraries from a dump.                     |
+| `redis.functionFlush`   | `FUNCTION FLUSH`   | `void`                                                   | Delete all libraries.                              |
+| `redis.functionKill`    | `FUNCTION KILL`    | `void`                                                   | Stop a running read-only function.                 |
+| `redis.functionStats`   | `FUNCTION STATS`   | `readonly (readonly [string, RespValue])[]`              | Return running-function and engine statistics.     |
+| `redis.functionHelp`    | `FUNCTION HELP`    | `readonly string[]`                                      | Return the FUNCTION help text.                     |
+
+## `ScriptArguments`
+
+<TypeTable
+  type={{
+    keys: {
+      type: "ReadonlyArray<string | Uint8Array>",
+      description: "Keys the script touches. Required, may be empty.",
+      required: true,
+    },
+    args: {
+      type: "ReadonlyArray<string | Uint8Array>",
+      description: "Extra arguments passed to the script.",
+      required: false,
+    },
+  }}
+/>
+
+`FunctionListOptions` for `functionList` is `{ libraryName?: string | Uint8Array; withCode?: boolean }`. `scriptFlush` and `functionFlush` take a mode of `"SYNC"` or `"ASYNC"`. `functionLoad` takes `(source, replace?)`. `functionRestore` takes a dump and a policy of `"FLUSH"`, `"APPEND"` or `"REPLACE"`.
+
+## `RedisScripts`
+
+| Method            | Reply type | Purpose                                                                    |
+| ----------------- | ---------- | -------------------------------------------------------------------------- |
+| `scripts.execute` | `A`        | Run a `RedisScript<A, E, R>` with `{ keys, args? }`, loading it on demand. |
+
+`RedisScript<A, E, R>` is `{ source: Redacted<Uint8Array>; sha1: string; readOnly: boolean; decode: ReplyDecoder<A, E, R> }`. `RedisScript.make` takes `{ source, decode, readOnly? }`.
+
+`ScriptOptions` configures the layer. See [`scripts`](/docs/redis/reference/configuration#scripts).

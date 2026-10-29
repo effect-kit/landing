@@ -1,0 +1,75 @@
+---
+title: Scanning
+description: Walk keys, hashes, sets and sorted sets as lazy Streams over cursors.
+keywords: [SCAN, HSCAN, SSCAN, ZSCAN, cursor, Stream]
+---
+
+Redis scans return a few entries and a cursor. The scan methods on `redis` hide the cursor and give you a `Stream` that asks for the next page when you pull. Take only what you need and the rest is never fetched.
+
+**Example** (Collecting the First 20 Matching Keys)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const keys = yield* redis
+    .scanKeys({ match: "user:*", count: 100 })
+    .pipe(Stream.take(20), Stream.runCollect);
+  //    ^?
+
+  return keys.map((key) => new TextDecoder().decode(key));
+});
+```
+
+`match` is a glob pattern and `count` is a hint for the page size. `scanKeys` also takes `type` to filter by key type. Keys are `Uint8Array`, so decode them before use.
+
+<Callout type="info" title="Scans can repeat keys">
+  A scan is not a snapshot. A key can appear more than once, and keys added or removed during the
+  scan can be missed or seen. Deduplicate if repeats matter.
+</Callout>
+
+## Scanning one collection
+
+Each collection type has its own stream.
+
+| Method                                | Element type                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `redis.scanKeys(options?)`            | `Uint8Array`                                                             |
+| `redis.scanHash(key, options?)`       | `readonly [field, value]` as `Uint8Array` pairs                          |
+| `redis.scanHashFields(key, options?)` | `Uint8Array` field names                                                 |
+| `redis.scanSet(key, options?)`        | `Uint8Array` members                                                     |
+| `redis.scanSortedSet(key, options?)`  | `readonly [member, score]`, member as `Uint8Array` and score as `string` |
+
+**Example** (Streaming a Sorted Set)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.zadd("leaderboard", [
+    [1.5, "ada"],
+    [2, "lin"],
+  ]);
+
+  const entries = yield* Stream.runCollect(redis.scanSortedSet("leaderboard"));
+  //    ^?
+
+  return entries;
+});
+```
+
+Scores come back as strings.
+
+## Paging by hand
+
+`redis.scan`, `redis.hscan`, `redis.sscan` and `redis.zscan` run one command and return a `ScanPage` with a `cursor` string and the `entries` for that page. The cursor is an opaque decimal string. Use these when you must store the cursor between requests.
+
+On a cluster, `scanKeys` walks the primary nodes one after another. See [scanning a cluster](/docs/redis/cluster/scanning).

@@ -1,0 +1,126 @@
+---
+title: MailerSend
+description: "Send email through MailerSend with the @effect-kit/emails/mailersend Layer."
+---
+
+The `@effect-kit/emails/mailersend` subpath sends messages through [MailerSend](https://developers.mailersend.com) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect mailersend@3.6.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`MailerSend.layerConfig()` reads these variables:
+
+| Variable             | Required | Value   |
+| -------------------- | -------- | ------- |
+| `MAILERSEND_API_KEY` | yes      | API key |
+
+**Example** (Sending a Message With MailerSend)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as MailerSend from "@effect-kit/emails/mailersend";
+
+const EmailLive = MailerSend.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your MailerSend account is allowed to send from.
+
+## Options
+
+`MailerSend.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+MailerSend reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | one      | yes     | no          | no            | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- More than one `replyTo` address (feature `multipleReplyTo`).
+- Any attachment (feature `attachments`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- MailerSend takes one reply-to address and no attachments through this package. Both fail before sending.
+- Header names may contain only letters, digits and hyphens. Any other name fails with `InvalidMessageError` (path `headers`) and `acceptance: "notSubmitted"`.
+- A send is accepted only on an HTTP 202 response. If MailerSend reports suppressed recipients, the receipt is `partiallyAccepted` with one outcome per recipient. When every recipient is suppressed the send fails with `MessageRejectedError`.
+
+## Using your own client
+
+`layerClient` takes any object with `email.send(message)`, which a `MailerSend` client has. `options` is optional. The client must return the response object with `statusCode`, `headers` and `body`, which is what the SDK does.
+
+**Example** (Borrowing a MailerSend Client)
+
+```ts
+import { MailerSend } from "mailersend";
+import * as MailerSendEmail from "@effect-kit/emails/mailersend";
+
+const client = new MailerSend({ apiKey: "fake-key" });
+
+const EmailLive = MailerSendEmail.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "mailersend"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                        |
+| --------- | -------------------------------------------------- |
+| `timeout` | The timeout is not finite and positive.            |
+| `token`   | The API key is not printable ASCII without spaces. |
+
+| MailerSend failure                        | Reason                                            |
+| ----------------------------------------- | ------------------------------------------------- |
+| HTTP 202 with an `ALL_SUPPRESSED` warning | `MessageRejectedError` (`acceptance: "rejected"`) |
+| A success status other than 202           | `UnexpectedResponseError`                         |
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors). A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`.

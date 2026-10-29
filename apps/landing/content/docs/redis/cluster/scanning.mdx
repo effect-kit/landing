@@ -1,0 +1,71 @@
+---
+title: Scanning a cluster
+description: Walk every key in a cluster with scanKeys, or use CLUSTERSCAN on Valkey.
+keywords: [SCAN, CLUSTERSCAN, scanKeys, topology-changed]
+---
+
+`SCAN` has no key, so a plain `redis.scan()` on a cluster fails with `ClusterError` and `reason: "explicit-target-required"`. Scan the whole cluster through the `RedisCluster` service instead.
+
+**Example** (Counting Keys Across the Cluster)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { RedisCluster } from "@effect-kit/redis";
+
+export const countKeys = Effect.gen(function* () {
+  const cluster = yield* RedisCluster;
+
+  return yield* cluster.scanKeys({ match: "user:*", count: 100 }).pipe(Stream.runCount);
+});
+```
+
+`cluster.scanKeys` reads the topology once, then scans each primary in turn with `SCAN`. It returns a `Stream` of keys as `Uint8Array`.
+
+## Scans are not snapshots
+
+A scan can return a key more than once, and it can miss keys written while it runs. Deduplicate if that matters.
+
+If the topology changes during the scan, for example after a failover or a slot move, the stream fails with `ClusterError` where `reason` is `"topology-changed"` and `delivery` is `"replied"`. The scan checks before and after each page. A new primary would otherwise be missed without any signal.
+
+**Example** (Restarting a Scan After a Topology Change)
+
+```ts twoslash
+import { Effect, Stream } from "effect";
+import { RedisCluster } from "@effect-kit/redis";
+
+export const listKeys = Effect.gen(function* () {
+  const cluster = yield* RedisCluster;
+  return yield* cluster.scanKeys().pipe(Stream.runCollect);
+}).pipe(
+  Effect.retry({
+    times: 2,
+    while: (error) => error._tag === "ClusterError" && error.reason === "topology-changed",
+  }),
+);
+```
+
+Here the retry restarts the whole scan. That is safe because a scan only reads.
+
+## Scanning one node
+
+`cluster.node(id)` returns a `Redis`-like client for one node, and its `scanKeys` scans only that node. Use `cluster.topology` to list the primary ids.
+
+## CLUSTERSCAN on Valkey
+
+Valkey 9.1.0 and later has `CLUSTERSCAN`, which walks the whole cluster with one opaque cursor. `cluster.scanCluster` streams the keys, and `cluster.clusterScan` returns one page. The cursor is a string, not a number. A `slot` option limits the scan to one slot.
+
+**Example** (Reading One Page With CLUSTERSCAN)
+
+```ts twoslash
+import { Effect } from "effect";
+import { RedisCluster } from "@effect-kit/redis";
+
+export const firstPage = Effect.gen(function* () {
+  const cluster = yield* RedisCluster;
+  const page = yield* cluster.clusterScan("0", { count: 100 });
+
+  return { next: page.cursor, keys: page.entries.length };
+});
+```
+
+Redis has no `CLUSTERSCAN`. On a Redis cluster, use `cluster.scanKeys`.

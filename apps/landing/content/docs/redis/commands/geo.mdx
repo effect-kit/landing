@@ -1,0 +1,103 @@
+---
+title: Geo
+description: Look up the geospatial commands, GeoQuery and the result types.
+---
+
+Geo commands store longitude and latitude pairs in a sorted set and search them by radius or box.
+
+**Example** (Finding Nearby Places)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+import type { GeoQuery } from "@effect-kit/redis";
+
+const query: GeoQuery = {
+  origin: { longitude: 15, latitude: 37 },
+  area: { radius: 200, unit: "km" },
+  order: "ASC",
+};
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.geoadd("places", [
+    { longitude: 13.361389, latitude: 38.115556, member: "palermo" },
+    { longitude: 15.087269, latitude: 37.502669, member: "catania" },
+  ]);
+
+  const near = yield* redis.geosearchWith("places", query, { distance: true });
+  //    ^?
+
+  return near;
+});
+```
+
+`geosearch` returns member names as bytes. `geosearchWith` returns `GeoResult` values with the extra details you ask for.
+
+## Methods
+
+| Method                      | Command                            | Reply type                                     | Purpose                                                                     |
+| --------------------------- | ---------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------- |
+| `redis.geoadd`              | `GEOADD`                           | `bigint`                                       | Add members with coordinates.                                               |
+| `redis.geopos`              | `GEOPOS`                           | `readonly Option<readonly [number, number]>[]` | Read member coordinates as longitude and latitude.                          |
+| `redis.geodist`             | `GEODIST`                          | `Option<number>`                               | Return the distance between two members as a number.                        |
+| `redis.geodistToken`        | `GEODIST`                          | `Option<string>`                               | Return the distance as the server's decimal text.                           |
+| `redis.geohash`             | `GEOHASH`                          | `readonly Option<string>[]`                    | Return member geohash strings.                                              |
+| `redis.geosearch`           | `GEOSEARCH`                        | `readonly Uint8Array[]`                        | Find members inside a circle or box.                                        |
+| `redis.geosearchWith`       | `GEOSEARCH`                        | `readonly GeoResult[]`                         | Find members and include distance, hash or coordinates.                     |
+| `redis.geosearchstore`      | `GEOSEARCHSTORE`                   | `bigint`                                       | Store the members found by a search in a key.                               |
+| `redis.georadius`           | `GEORADIUS`                        | `readonly Uint8Array[]`                        | Find members within a radius of a point (older form).                       |
+| `redis.georadiusRo`         | `GEORADIUS_RO`                     | `readonly Uint8Array[]`                        | Find members within a radius of a point without writing.                    |
+| `redis.georadiusbymember`   | `GEORADIUSBYMEMBER`                | `readonly Uint8Array[]`                        | Find members within a radius of a member (older form).                      |
+| `redis.georadiusbymemberRo` | `GEORADIUSBYMEMBER_RO`             | `readonly Uint8Array[]`                        | Find members within a radius of a member without writing.                   |
+| `redis.georadiusWith`       | `GEORADIUS` or `GEORADIUSBYMEMBER` | `readonly GeoResult[]`                         | Radius search with distance, hash or coordinates, from a point or a member. |
+| `redis.georadiusStore`      | `GEORADIUS` or `GEORADIUSBYMEMBER` | `bigint`                                       | Radius search that stores the result in a key.                              |
+
+## `GeoQuery`
+
+`geosearch`, `geosearchWith` and `geosearchstore` take a `GeoQuery`. `origin` is a member or a point, and `area` is a circle or a box.
+
+<TypeTable
+  type={{
+    origin: {
+      type: "{ member: string | Uint8Array } | { longitude: number; latitude: number }",
+      description: "Where to search from.",
+      required: true,
+    },
+    area: {
+      type: "{ radius: number; unit: GeoUnit } | { width: number; height: number; unit: GeoUnit }",
+      description: "A circle or a box.",
+      required: true,
+    },
+    order: { type: '"ASC" | "DESC"', description: "Sort by distance.", required: false },
+    count: {
+      type: "{ value: number | bigint; any?: boolean }",
+      description: "Limit the number of results.",
+      required: false,
+    },
+  }}
+/>
+
+- `GeoUnit` is `"m" | "km" | "ft" | "mi"`.
+- `GeoOrigin` is the `origin` type above.
+- `GeoSelection` is `{ order?; count? }`, used by the older `georadius` methods.
+- `GeoDetails` is `{ distance?: boolean; hash?: boolean; coordinates?: boolean }`, used by the `With` methods.
+- `GeoPosition` is `{ longitude: number; latitude: number; member: string | Uint8Array }`.
+- `GeoAddOptions` for `geoadd` is `{ condition?: "NX" | "XX"; changed?: boolean }`.
+
+`GeoResult` is the element of the `With` replies. Each detail is an `Option` and is `None` unless you asked for it.
+
+<TypeTable
+  type={{
+    member: { type: "Uint8Array", description: "The member name.", required: true },
+    distance: { type: "Option<number>", description: "Distance from the origin.", required: true },
+    hash: { type: "Option<bigint>", description: "The raw geohash integer.", required: true },
+    coordinates: {
+      type: "Option<readonly [number, number]>",
+      description: "Longitude and latitude.",
+      required: true,
+    },
+  }}
+/>

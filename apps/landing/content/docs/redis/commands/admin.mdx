@@ -1,0 +1,166 @@
+---
+title: Administration
+description: Look up RedisAdmin and its server, ACL, config, client and diagnostics commands.
+---
+
+`RedisAdmin` groups the commands that manage a server instead of its data. Each call runs on a leased session of an explicitly configured backend, and nothing is broadcast to other nodes.
+
+**Example** (Reading Server Information)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { RedisAdmin } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const admin = yield* RedisAdmin;
+
+  const info = yield* admin.info(["server"]);
+  //    ^?
+  const size = yield* admin.dbsize();
+  //    ^?
+
+  return { info: info.sections.map((section) => section.name), size };
+});
+```
+
+`info` parses the reply into sections. Values stay strings, so versions and counters are not turned into JavaScript numbers.
+
+<Callout type="warn" title="Some replies are redacted">
+  Replies that can contain secrets or application data, such as `configGet`, `aclList`, `clientList`
+  and `slowlogGet`, are wrapped in `Redacted`. Read them with `Redacted.value`.
+</Callout>
+
+`RedisAdmin` is provided by the Node and Bun layers and needs `RedisSessions`. Upstash has no `RedisAdmin`. Two members are not commands. `admin.execute(command)` runs any `Command` on a session, and `admin.withSession(body)` gives you the `RedisSession`.
+
+## Connection checks on `Redis`
+
+| Method              | Command | Reply type   | Purpose                         |
+| ------------------- | ------- | ------------ | ------------------------------- |
+| `redis.ping`        | `PING`  | `void`       | Check that the server answers.  |
+| `redis.pingMessage` | `PING`  | `Uint8Array` | Send a message and get it back. |
+| `redis.echo`        | `ECHO`  | `Uint8Array` | Send a message and get it back. |
+
+## Server information and configuration
+
+| Method                  | Command            | Reply type                                                 | Purpose                                             |
+| ----------------------- | ------------------ | ---------------------------------------------------------- | --------------------------------------------------- |
+| `admin.configGet`       | `CONFIG GET`       | `Redacted<readonly (readonly [Uint8Array, Uint8Array])[]>` | Read configuration parameters by pattern.           |
+| `admin.configSet`       | `CONFIG SET`       | `void`                                                     | Change configuration parameters.                    |
+| `admin.configRewrite`   | `CONFIG REWRITE`   | `void`                                                     | Write the running configuration to the config file. |
+| `admin.configResetStat` | `CONFIG RESETSTAT` | `void`                                                     | Reset server statistics.                            |
+| `admin.configHelp`      | `CONFIG HELP`      | `readonly string[]`                                        | Return the CONFIG help text.                        |
+| `admin.info`            | `INFO`             | `ServerInfo`                                               | Read and parse server information by section.       |
+| `admin.dbsize`          | `DBSIZE`           | `bigint`                                                   | Count the keys in the current database.             |
+| `admin.time`            | `TIME`             | `readonly [bigint, bigint]`                                | Read the server clock.                              |
+| `admin.lastSave`        | `LASTSAVE`         | `bigint`                                                   | Return the time of the last successful save.        |
+| `admin.role`            | `ROLE`             | `readonly RespValue[]`                                     | Return the server's replication role.               |
+| `admin.lolwut`          | `LOLWUT`           | `string`                                                   | Return the LOLWUT text.                             |
+
+## Persistence, replication and backup
+
+| Method                | Command          | Reply type                               | Purpose                                                    |
+| --------------------- | ---------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `admin.save`          | `SAVE`           | `void`                                   | Write a snapshot, blocking the server.                     |
+| `admin.bgsave`        | `BGSAVE`         | `string`                                 | Write a snapshot in the background.                        |
+| `admin.bgrewriteaof`  | `BGREWRITEAOF`   | `string`                                 | Rewrite the append-only file in the background.            |
+| `admin.flushDb`       | `FLUSHDB`        | `void`                                   | Delete every key in the current database.                  |
+| `admin.flushAll`      | `FLUSHALL`       | `void`                                   | Delete every key in every database.                        |
+| `admin.swapDb`        | `SWAPDB`         | `void`                                   | Swap two databases.                                        |
+| `admin.replicaOf`     | `REPLICAOF`      | `string`                                 | Make the server a replica of another, or stop replicating. |
+| `admin.slaveOf`       | `SLAVEOF`        | `string`                                 | Older name for REPLICAOF.                                  |
+| `admin.failover`      | `FAILOVER`       | `void`                                   | Start a coordinated failover to a replica.                 |
+| `admin.migrate`       | `MIGRATE`        | `"NOKEY" \| "OK"`                        | Move keys to another server.                               |
+| `admin.flushSlots`    | `SFLUSH`         | `readonly (readonly [bigint, bigint])[]` | Delete keys in slot ranges (experimental).                 |
+| `admin.backupStart`   | `BACKUP START`   | `void`                                   | Start a backup.                                            |
+| `admin.backupSeal`    | `BACKUP SEAL`    | `void`                                   | Seal a backup.                                             |
+| `admin.backupAbort`   | `BACKUP ABORT`   | `void`                                   | Abort a backup.                                            |
+| `admin.backupCleanup` | `BACKUP CLEANUP` | `void`                                   | Remove backup files.                                       |
+| `admin.backupList`    | `BACKUP LIST`    | `Redacted<readonly Uint8Array[]>`        | List backups.                                              |
+| `admin.backupStatus`  | `BACKUP STATUS`  | `BackupStatus`                           | Return backup status.                                      |
+| `admin.backupHelp`    | `BACKUP HELP`    | `readonly string[]`                      | Return the BACKUP help text.                               |
+
+## Memory, logs and latency
+
+| Method                    | Command               | Reply type                                                         | Purpose                                  |
+| ------------------------- | --------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+| `admin.memoryUsage`       | `MEMORY USAGE`        | `Option<bigint>`                                                   | Estimate the memory used by a key.       |
+| `admin.memoryStats`       | `MEMORY STATS`        | `readonly (readonly [string, RespValue])[]`                        | Return memory statistics as pairs.       |
+| `admin.memoryDoctor`      | `MEMORY DOCTOR`       | `string`                                                           | Return memory advice text.               |
+| `admin.memoryMallocStats` | `MEMORY MALLOC-STATS` | `string`                                                           | Return allocator statistics.             |
+| `admin.memoryPurge`       | `MEMORY PURGE`        | `void`                                                             | Ask the allocator to release memory.     |
+| `admin.memoryHelp`        | `MEMORY HELP`         | `readonly string[]`                                                | Return the MEMORY help text.             |
+| `admin.slowlogGet`        | `SLOWLOG GET`         | `Redacted<readonly RespValue[]>`                                   | Read slow log entries.                   |
+| `admin.slowlogLen`        | `SLOWLOG LEN`         | `bigint`                                                           | Count slow log entries.                  |
+| `admin.slowlogReset`      | `SLOWLOG RESET`       | `void`                                                             | Clear the slow log.                      |
+| `admin.slowlogHelp`       | `SLOWLOG HELP`        | `readonly string[]`                                                | Return the SLOWLOG help text.            |
+| `admin.commandlogGet`     | `COMMANDLOG GET`      | `Redacted<readonly RespValue[]>`                                   | Read command log entries.                |
+| `admin.commandlogLen`     | `COMMANDLOG LEN`      | `bigint`                                                           | Count command log entries.               |
+| `admin.commandlogReset`   | `COMMANDLOG RESET`    | `void`                                                             | Clear a command log.                     |
+| `admin.commandlogHelp`    | `COMMANDLOG HELP`     | `readonly string[]`                                                | Return the COMMANDLOG help text.         |
+| `admin.latencyLatest`     | `LATENCY LATEST`      | `readonly (readonly [string, bigint, bigint, bigint])[]`           | Return the latest latency events.        |
+| `admin.latencyHistory`    | `LATENCY HISTORY`     | `readonly (readonly [bigint, bigint])[]`                           | Return the history of one latency event. |
+| `admin.latencyHistogram`  | `LATENCY HISTOGRAM`   | `readonly (readonly [string, RespValue])[]`                        | Return per-command latency histograms.   |
+| `admin.latencyGraph`      | `LATENCY GRAPH`       | `string`                                                           | Return an ASCII graph of an event.       |
+| `admin.latencyDoctor`     | `LATENCY DOCTOR`      | `string`                                                           | Return latency advice text.              |
+| `admin.latencyReset`      | `LATENCY RESET`       | `bigint`                                                           | Reset latency events.                    |
+| `admin.latencyHelp`       | `LATENCY HELP`        | `readonly string[]`                                                | Return the LATENCY help text.            |
+| `admin.hotkeysStart`      | `HOTKEYS START`       | `void`                                                             | Start collecting hot key metrics.        |
+| `admin.hotkeysGet`        | `HOTKEYS GET`         | `Redacted<readonly (readonly (readonly [string, RespValue])[])[]>` | Read hot key results.                    |
+| `admin.hotkeysStop`       | `HOTKEYS STOP`        | `void`                                                             | Stop collecting.                         |
+| `admin.hotkeysReset`      | `HOTKEYS RESET`       | `void`                                                             | Clear hot key results.                   |
+| `admin.hotkeysHelp`       | `HOTKEYS HELP`        | `readonly string[]`                                                | Return the HOTKEYS help text.            |
+
+## Clients, modules and commands
+
+| Method                         | Command                   | Reply type                                               | Purpose                                         |
+| ------------------------------ | ------------------------- | -------------------------------------------------------- | ----------------------------------------------- |
+| `admin.clientId`               | `CLIENT ID`               | `bigint`                                                 | Return the connection ID.                       |
+| `admin.clientInfo`             | `CLIENT INFO`             | `Redacted<string>`                                       | Return information about this connection.       |
+| `admin.clientList`             | `CLIENT LIST`             | `Redacted<string>`                                       | List client connections.                        |
+| `admin.clientGetName`          | `CLIENT GETNAME`          | `Option<string>`                                         | Read the connection name.                       |
+| `admin.clientSetName`          | `CLIENT SETNAME`          | `void`                                                   | Set the connection name.                        |
+| `admin.clientSetInfo`          | `CLIENT SETINFO`          | `void`                                                   | Set library name or version for the connection. |
+| `admin.clientGetRedir`         | `CLIENT GETREDIR`         | `bigint`                                                 | Return the tracking redirect ID.                |
+| `admin.clientNoEvict`          | `CLIENT NO-EVICT`         | `void`                                                   | Protect this connection from client eviction.   |
+| `admin.clientNoTouch`          | `CLIENT NO-TOUCH`         | `void`                                                   | Stop this connection updating key access times. |
+| `admin.clientPause`            | `CLIENT PAUSE`            | `void`                                                   | Pause client commands.                          |
+| `admin.clientUnpause`          | `CLIENT UNPAUSE`          | `void`                                                   | Resume paused clients.                          |
+| `admin.clientUnblock`          | `CLIENT UNBLOCK`          | `boolean`                                                | Unblock a client waiting on a blocking command. |
+| `admin.clientKill`             | `CLIENT KILL`             | `bigint`                                                 | Close connections that match filters.           |
+| `admin.clientKillAddress`      | `CLIENT KILL`             | `void`                                                   | Close the connection at an address.             |
+| `admin.clientHelp`             | `CLIENT HELP`             | `readonly string[]`                                      | Return the CLIENT help text.                    |
+| `admin.echo`                   | `ECHO`                    | `Uint8Array`                                             | Return the message sent.                        |
+| `admin.moduleList`             | `MODULE LIST`             | `readonly (readonly (readonly [string, RespValue])[])[]` | List loaded modules.                            |
+| `admin.moduleLoad`             | `MODULE LOAD`             | `void`                                                   | Load a module.                                  |
+| `admin.moduleLoadEx`           | `MODULE LOADEX`           | `void`                                                   | Load a module with configuration.               |
+| `admin.moduleUnload`           | `MODULE UNLOAD`           | `void`                                                   | Unload a module.                                |
+| `admin.moduleHelp`             | `MODULE HELP`             | `readonly string[]`                                      | Return the MODULE help text.                    |
+| `admin.command`                | `COMMAND`                 | `readonly RespValue[]`                                   | Describe every server command.                  |
+| `admin.commandCount`           | `COMMAND COUNT`           | `bigint`                                                 | Count the server's commands.                    |
+| `admin.commandInfo`            | `COMMAND INFO`            | `readonly RespValue[]`                                   | Describe selected commands.                     |
+| `admin.commandDocs`            | `COMMAND DOCS`            | `readonly (readonly [string, RespValue])[]`              | Return command documentation.                   |
+| `admin.commandGetKeys`         | `COMMAND GETKEYS`         | `readonly Uint8Array[]`                                  | Extract the keys from a command line.           |
+| `admin.commandGetKeysAndFlags` | `COMMAND GETKEYSANDFLAGS` | `readonly (readonly [Uint8Array, readonly string[]])[]`  | Extract keys with their access flags.           |
+| `admin.commandList`            | `COMMAND LIST`            | `readonly string[]`                                      | List command names, optionally filtered.        |
+| `admin.commandHelp`            | `COMMAND HELP`            | `readonly string[]`                                      | Return the COMMAND help text.                   |
+
+## ACL
+
+| Method              | Command         | Reply type                                                         | Purpose                                      |
+| ------------------- | --------------- | ------------------------------------------------------------------ | -------------------------------------------- |
+| `admin.aclCat`      | `ACL CAT`       | `readonly string[]`                                                | List ACL categories, or the commands in one. |
+| `admin.aclList`     | `ACL LIST`      | `Redacted<readonly string[]>`                                      | List ACL rules as strings.                   |
+| `admin.aclUsers`    | `ACL USERS`     | `readonly string[]`                                                | List user names.                             |
+| `admin.aclGetUser`  | `ACL GETUSER`   | `Redacted<Option<readonly (readonly [string, RespValue])[]>>`      | Read one user's rules.                       |
+| `admin.aclSetUser`  | `ACL SETUSER`   | `void`                                                             | Create or change a user.                     |
+| `admin.aclDelUser`  | `ACL DELUSER`   | `bigint`                                                           | Delete users.                                |
+| `admin.aclWhoAmI`   | `ACL WHOAMI`    | `string`                                                           | Return the current user name.                |
+| `admin.aclGenPass`  | `ACL GENPASS`   | `Redacted<string>`                                                 | Generate a password.                         |
+| `admin.aclDryRun`   | `ACL DRYRUN`    | `string`                                                           | Check whether a user could run a command.    |
+| `admin.aclDigest`   | `ACL DIGEST`    | `string`                                                           | Return a digest of the ACL.                  |
+| `admin.aclLog`      | `ACL LOG`       | `Redacted<readonly (readonly (readonly [string, RespValue])[])[]>` | Read recent ACL security events.             |
+| `admin.aclLogReset` | `ACL LOG RESET` | `void`                                                             | Clear the ACL log.                           |
+| `admin.aclLoad`     | `ACL LOAD`      | `void`                                                             | Reload ACL rules from the ACL file.          |
+| `admin.aclSave`     | `ACL SAVE`      | `void`                                                             | Save ACL rules to the ACL file.              |
+| `admin.aclHelp`     | `ACL HELP`      | `readonly string[]`                                                | Return the ACL help text.                    |

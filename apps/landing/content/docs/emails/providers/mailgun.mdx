@@ -1,0 +1,142 @@
+---
+title: Mailgun
+description: "Send email through Mailgun with the @effect-kit/emails/mailgun Layer."
+---
+
+The `@effect-kit/emails/mailgun` subpath sends messages through [Mailgun](https://documentation.mailgun.com) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect mailgun.js@14.1.0 form-data@4.0.5
+```
+
+Both packages are pinned peers and optional until you import this subpath.
+
+## Setup
+
+`Mailgun.layerConfig()` reads these variables:
+
+| Variable          | Required | Value                                    |
+| ----------------- | -------- | ---------------------------------------- |
+| `MAILGUN_API_KEY` | yes      | API key                                  |
+| `MAILGUN_DOMAIN`  | yes      | Sending domain, such as `mg.example.com` |
+| `MAILGUN_REGION`  | yes      | `us` or `eu`                             |
+
+**Example** (Sending a Message With Mailgun)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Mailgun from "@effect-kit/emails/mailgun";
+
+const EmailLive = Mailgun.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Mailgun account is allowed to send from.
+
+## Options
+
+`Mailgun.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    domain: {
+      type: "string",
+      description: "Sending domain. Must be a valid hostname.",
+      required: true,
+    },
+    region: {
+      type: '"us" | "eu"',
+      description: "Selects the API host.",
+      required: true,
+    },
+    endpoint: {
+      type: "URL",
+      description:
+        "Overrides the region host. Must be http or https and an origin only, with no path, credentials, query or fragment.",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Mailgun reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | no            | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An attachment with a `contentId` (feature `inlineAttachments`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- `region: "eu"` uses `https://api.eu.mailgun.net` and `region: "us"` uses `https://api.mailgun.net`. `endpoint` replaces both.
+- Mailgun has no inline image support here. Every attachment goes out as a regular attachment, so a `contentId` fails before sending with feature `inlineAttachments`.
+- Install `form-data` next to `mailgun.js`. Both are pinned peers.
+
+## Using your own client
+
+`layerClient` takes any object with `messages.create(domain, message)`, which a `mailgun.js` client has. Unlike most providers its `options` are required, because they carry the `domain`.
+
+**Example** (Borrowing a Mailgun Client)
+
+```ts
+import FormData from "form-data";
+import Mailgun from "mailgun.js";
+import * as MailgunEmail from "@effect-kit/emails/mailgun";
+
+const client = new Mailgun(FormData).client({ username: "api", key: "fake-key" });
+
+const EmailLive = MailgunEmail.layerClient(client, { domain: "mg.example.com" });
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. The client is created with its own region and URL, so `layerClient` does not take a `region`.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "mailgun"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`    | Raised when                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| `timeout`  | The timeout is not finite and positive.                                                    |
+| `token`    | The API key is not printable ASCII without spaces.                                         |
+| `region`   | The region is neither `us` nor `eu`.                                                       |
+| `endpoint` | The URL is not an http or https origin, or has credentials, a path, a query or a fragment. |
+| `domain`   | The domain is not a valid hostname.                                                        |
+
+Send failures use the HTTP status with the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`. See [Errors](/docs/emails/errors).

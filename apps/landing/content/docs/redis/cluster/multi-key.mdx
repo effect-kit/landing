@@ -1,0 +1,102 @@
+---
+title: Multi-key commands
+description: Keep the keys of one command, pipeline or transaction in the same hash slot with hash tags.
+keywords: [CROSSSLOT, hash tag, MGET, cross-slot]
+---
+
+A command that touches several keys works in a cluster only when all of them are in the same hash slot. The client checks this before it sends anything, so a violation fails with `ClusterError` where `reason` is `"cross-slot"` and `delivery` is `"unsent"`.
+
+**Example** (A Multi-Key Read That Spans Slots)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+export const read = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  // "foo" and "bar" hash to different slots
+  return yield* redis.mget(["foo", "bar"]);
+}).pipe(
+  Effect.catchTag("ClusterError", (error) =>
+    error.reason === "cross-slot" ? Effect.succeed("cross-slot") : Effect.fail(error),
+  ),
+);
+```
+
+Nothing reached a server, so the failure is safe to act on immediately.
+
+<Callout type="warn" title="Cross-slot fails before sending">
+  The check is in the client. The same keys fail the same way on every call, so retrying does not
+  help. Change the keys.
+</Callout>
+
+## Using hash tags
+
+A **hash tag** is the part of a key inside the first `{` and the first `}` after it. Only the tag is hashed, so keys that share a tag share a slot.
+
+**Example** (Keys That Share a Slot)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis, keySlot } from "@effect-kit/redis";
+
+export const read = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const sameSlot = keySlot("{account:42}:name") === keySlot("{account:42}:visits");
+  //    ^?
+
+  yield* redis.mset([
+    ["{account:42}:name", "Ada"],
+    ["{account:42}:visits", "0"],
+  ]);
+
+  return { sameSlot, values: yield* redis.mget(["{account:42}:name", "{account:42}:visits"]) };
+});
+```
+
+If a key has an empty tag (`{}`), the whole key is hashed. Binary keys are hashed as bytes.
+
+Put the tag on whatever the commands have in common, such as an account id. Keys that share a tag live on one node, so a very large tag becomes a hot spot.
+
+## Pipelines and transactions
+
+Every keyed command in a pipeline or transaction must be in one slot. The whole batch then runs on the node that owns it.
+
+**Example** (A Pipeline Within One Slot)
+
+```ts twoslash
+import { Effect, Result } from "effect";
+import { Commands, Redis } from "@effect-kit/redis";
+
+export const update = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const [saved, visits] = yield* redis.pipeline([
+    Commands.set("{account:42}:name", "Ada"),
+    Commands.incr("{account:42}:visits"),
+  ]);
+
+  if (Result.isFailure(visits)) return yield* visits.failure;
+  return { saved, visits: visits.success };
+});
+```
+
+A batch that spans slots fails with `cross-slot`. A batch with no keys, or with a command that has no fixed key or node, fails with `explicit-target-required`. See [Pipelines](/docs/redis/pipelines) and [Transactions](/docs/redis/transactions).
+
+## Other routing errors
+
+| `reason`                   | Cause                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `cross-slot`               | The keys of one command or batch hash to different slots.                                             |
+| `unresolved-keys`          | The command's keys cannot be read from its arguments, for example a custom command with dynamic keys. |
+| `explicit-target-required` | The command has no key to route by. Use a `ClusterTarget` through `RedisCluster`.                     |
+| `session-route`            | A command inside a session belongs to another node.                                                   |
+| `database`                 | The command changes database scope (`MOVE`, `SWAPDB`), or a non-zero `database` was requested.        |
+
+All of them have `delivery: "unsent"`.
+
+## ClusterTarget
+
+Commands without a key need a place to run. `RedisCluster` takes a `ClusterTarget` for these: `{ key }` for the node that owns that key, or `{ node }` for a node id. For example, `redis.scan()` fails with `explicit-target-required`; see [Scanning a cluster](/docs/redis/cluster/scanning).

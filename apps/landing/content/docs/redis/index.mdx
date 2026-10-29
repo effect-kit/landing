@@ -1,6 +1,63 @@
 ---
 title: Redis
-description: A Redis client built for Effect, with type-safe commands, scoped connections, and a simple, composable API.
+description: Run typed Redis commands from Effect programs on Node.js, Bun and Upstash.
+icon: intro
 ---
 
-<Callout type="warn">Placeholder page. Documentation is coming soon.</Callout>
+`@effect-kit/redis` is a Redis client for Effect 4. It speaks the Redis protocol itself over platform sockets or Effect HTTP, so Effect is its only runtime dependency. Commands are typed, connections belong to a scope, and every failure is a typed error.
+
+**Example** (Setting and Reading a Key)
+
+```ts twoslash
+import { Effect, Option } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.set("greeting", "Hello from Effect", {
+    expiry: { type: "EX", value: 60 },
+  });
+
+  const greeting = yield* redis.get("greeting");
+  //    ^?
+
+  return Option.getOrElse(greeting, () => "not found");
+});
+
+Effect.runPromise(program.pipe(Effect.provide(RedisLive))).then(console.log);
+// Output: Hello from Effect
+```
+
+`redis.get` returns `Option<string>`, so a missing key is `None` and not an error. The layer opens the connection when it is built and closes it with the scope.
+
+## What it is not
+
+- Not an ORM. Keys and values are strings or bytes, and JSON is opt-in through [typed values](/docs/redis/typed-values).
+- Not an in-memory fake. There is no test layer, so tests run against a real server.
+- Not a retrying client. After a command may have reached the server, the client does not send it again. See [errors and retries](/docs/redis/errors).
+
+<Cards>
+  <Card title="Quick start" href="/docs/redis/quick-start" icon={<Icon name="rocket" />}>
+    Install the package and run a first program.
+  </Card>
+  <Card title="Connecting" href="/docs/redis/connecting" icon={<Icon name="plug" />}>
+    Layers for Node.js, Bun and Upstash, with URLs, TLS and timeouts.
+  </Card>
+  <Card title="Errors and retries" href="/docs/redis/errors" icon={<Icon name="errors" />}>
+    Tagged errors and what `delivery` says about a failed command.
+  </Card>
+  <Card title="Runtimes" href="/docs/redis/runtimes" icon={<Icon name="runtime" />}>
+    What each runtime supports.
+  </Card>
+  <Card title="Cluster" href="/docs/redis/cluster" icon={<Icon name="cluster" />}>
+    Hash slots, redirects and multi-key commands.
+  </Card>
+  <Card title="Commands" href="/docs/redis/commands" icon={<Icon name="commands" />}>
+    Every command family with its reply types.
+  </Card>
+</Cards>

@@ -35,6 +35,10 @@
 - Agents read the site as Markdown: `/llms.txt`, `/llms-full.txt`, `.md` URLs and
   `Accept: text/markdown`. When a landing page changes, update
   `src/content/landing-markdown.ts` to match; docs Markdown is generated from the MDX.
+- Docs code blocks marked `twoslash` compile against the published `@effect-kit/*` packages at
+  build time; a type error or a `^?` caret that is not under an identifier fails the build. oxfmt
+  reformats code inside MDX, so re-check carets after formatting. The dev server can serve a stale
+  page after a broken edit; trust `pnpm build`.
 - Each page has one accent (blue for the kit, red for Redis, amber for emails) set with
   `data-accent`. Support dark and light themes, phone widths and reduced motion.
 

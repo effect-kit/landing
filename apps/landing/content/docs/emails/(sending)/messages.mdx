@@ -1,0 +1,68 @@
+---
+title: Messages
+description: Build the message you pass to email.send and learn what it accepts and rejects.
+---
+
+A message is a plain object. `email.send` validates it, checks it against the provider's capabilities, then submits it.
+
+**Example** (Sending a Message With Names, Copies and Headers)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  const receipt = yield* email.send({
+    from: { email: "hello@example.com", name: "Example Team" },
+    to: [{ email: "ada@example.com", name: "Ada" }, "grace@example.com"],
+    cc: "support@example.com",
+    replyTo: "support@example.com",
+    subject: "Your order has shipped",
+    text: "Order 1042 is on its way.",
+    html: "<p>Order 1042 is on its way.</p>",
+    headers: { "X-Order-Id": "1042" },
+  });
+  return receipt.status;
+  //       ^?
+});
+```
+
+## Fields
+
+| Field                  | Type              | Notes                                       |
+| ---------------------- | ----------------- | ------------------------------------------- |
+| `from`                 | address           | One sender                                  |
+| `to`                   | address or list   | Required. A list must not be empty          |
+| `cc`, `bcc`, `replyTo` | address or list   | Optional. A list must not be empty          |
+| `subject`              | string            | Not blank, no control characters            |
+| `text`, `html`         | string            | At least one is required. Not blank         |
+| `headers`              | record of strings | Custom headers only                         |
+| `attachments`          | list              | See [Attachments](/docs/emails/attachments) |
+
+These fields are the whole model. There are no tags, metadata, scheduling, template id or per-recipient data fields.
+
+<Callout type="error" title="Unknown keys are rejected">
+  A key outside the table, such as `tags` or `metadata`, fails the send with `InvalidMessageError`
+  and `acceptance: "notSubmitted"`. It is never silently dropped.
+</Callout>
+
+## Addresses
+
+An address is either a bare email string or a `Mailbox` object with an `email` and an optional `name`. A string like `"Ada <ada@example.com>"` is invalid: put the display name in the `name` field.
+
+The email must be ASCII, at most 254 characters, with a local part of at most 64. Internationalized domains and quoted local parts are not accepted.
+
+`to`, `cc`, `bcc` and `replyTo` take one address or a non-empty list. Whether a provider accepts a display name or more than one reply-to depends on its [capabilities](/docs/emails/choosing-a-provider).
+
+## Headers
+
+Header names are unique ignoring case, and values cannot contain control characters. These names are reserved and rejected:
+
+`from`, `sender`, `to`, `cc`, `bcc`, `reply-to`, `subject`, `date`, `message-id`, `mime-version`, `return-path`, `received`, `authentication-results`, `dkim-signature`, `authorization`, `proxy-authorization`, `host`, `idempotency-key`, `x-smtpapi`
+
+Names that start with `content-`, `resent-`, `resend-`, `x-ses-`, `x-mc-`, `x-mailgun-`, `x-mailin-` or `x-pm-` are also rejected.
+
+## Send options
+
+`email.send` takes a second argument, `SendOptions`, whose only field is `idempotencyKey`. Only some providers support it, so check [Choosing a provider](/docs/emails/choosing-a-provider).

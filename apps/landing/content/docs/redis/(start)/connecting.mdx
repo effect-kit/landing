@@ -1,0 +1,141 @@
+---
+title: Connecting
+description: Build the layer that connects to your server on Node.js, Bun or Upstash.
+keywords: [rediss, TLS, Unix socket, REDIS_URL, Config]
+---
+
+A runtime layer opens the connection and provides `Redis` and the services next to it. Pick the layer for the runtime your code runs on.
+
+**Example** (Reading Connection Settings From Config)
+
+```ts tab="Node.js" tab-group="runtime"
+import { Config } from "effect";
+
+import { RedisNode } from "@effect-kit/redis/node";
+
+const settings = Config.all({ url: Config.String("REDIS_URL") });
+
+export const RedisLive = RedisNode.layerConfig(settings);
+```
+
+```ts tab="Bun" tab-group="runtime"
+import { Config } from "effect";
+
+import { RedisBun } from "@effect-kit/redis/bun";
+
+const settings = Config.all({ url: Config.String("REDIS_URL") });
+
+export const RedisLive = RedisBun.layerConfig(settings);
+```
+
+```ts tab="Upstash" tab-group="runtime"
+import { Config } from "effect";
+
+import { RedisUpstash } from "@effect-kit/redis/upstash";
+
+export const RedisLive = RedisUpstash.layerConfig(
+  Config.all({
+    url: Config.String("UPSTASH_REDIS_REST_URL"),
+    token: Config.Redacted("UPSTASH_REDIS_REST_TOKEN"),
+  }),
+);
+```
+
+`layer` takes the settings directly and `layerConfig` takes an Effect `Config` of them. The Upstash layer includes Effect's `FetchHttpClient`. To use your own `HttpClient`, call `RedisUpstash.layerWithHttpClient`.
+
+<Callout type="warn" title="Upstash has fewer services">
+  `RedisUpstash` provides `Redis` and `UpstashEvents`. It does not provide `RedisSessions`, so there
+  is no WATCH, no blocking commands and no tracking over HTTP. See
+  [Upstash](/docs/redis/runtimes/upstash).
+</Callout>
+
+## Choosing a URL or an endpoint
+
+Pass exactly one of `url` or `endpoint`. Passing both or neither fails with a `RedisConfigError`.
+
+- `url` is a `redis://` or `rediss://` string. The path can hold a database number, as in `redis://localhost:6379/2`. The URL cannot have a query string or hash.
+- `endpoint` is `{ host, port?, tls? }` for TCP, `{ path }` for a Unix socket, or `{ url, tls? }`. The port defaults to `6379`.
+
+**Example** (Connecting With TLS or a Unix Socket)
+
+```ts twoslash
+import { RedisNode } from "@effect-kit/redis/node";
+
+// Verified TLS: rediss:// verifies the server certificate
+export const Tls = RedisNode.layer({ url: "rediss://cache.example.com:6380" });
+
+// TLS options on an endpoint
+export const TlsEndpoint = RedisNode.layer({
+  endpoint: { host: "cache.example.com", port: 6380, tls: { serverName: "cache.example.com" } },
+});
+
+// Unix socket
+export const Socket = RedisNode.layer({ endpoint: { path: "/var/run/redis/redis.sock" } });
+```
+
+A `redis:` URL combined with `tls` is a configuration error. Use `rediss:` for TLS URLs. A `rediss:` URL verifies the server certificate. To turn that off, pass `endpoint: { url, tls: { rejectUnauthorized: false } }`.
+
+## Common options
+
+These options sit next to `url` or `endpoint` on `RedisNode.layer` and `RedisBun.layer`. The full list is in [Configuration](/docs/redis/reference/configuration).
+
+<TypeTable
+  type={{
+    database: {
+      type: "number",
+      description:
+        "Database to select after connecting. Conflicts with a database in the URL path.",
+      default: "0",
+      required: false,
+    },
+    clientName: {
+      type: "string",
+      description: "Name sent to the server for this connection.",
+      required: false,
+    },
+    protocol: {
+      type: '"resp2" | "resp3" | "auto"',
+      description:
+        "Protocol version. auto tries RESP3 and falls back to RESP2 only when the server does not know HELLO.",
+      default: '"auto"',
+      required: false,
+    },
+    connectTimeoutMillis: {
+      type: "number",
+      description: "Time allowed to open a connection.",
+      default: "10000",
+      required: false,
+    },
+    commandTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for a reply.",
+      default: "30000",
+      required: false,
+    },
+    credentials: {
+      type: "CredentialInput",
+      description:
+        "Username and password as Redacted values, an Effect that returns them, or RedisCredentials.provider.",
+      required: false,
+    },
+  }}
+/>
+
+## Passing credentials
+
+`credentials` takes `Redacted` values. A plain string is a type error. Credentials can also be part of the URL, but not both.
+
+**Example** (Reading a Password From Config)
+
+```ts twoslash
+import { Config } from "effect";
+
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layerConfig(
+  Config.all({
+    url: Config.String("REDIS_URL"),
+    credentials: Config.all({ password: Config.Redacted("REDIS_PASSWORD") }),
+  }),
+);
+```

@@ -1,0 +1,77 @@
+---
+title: Quick start
+description: Connect to a local server, write a key, read it back and count with INCR.
+---
+
+This page runs a first program against a Redis-compatible server on `localhost:6379`.
+
+<Steps>
+<Step>
+
+### Install the package
+
+```package-install
+@effect-kit/redis effect
+```
+
+</Step>
+<Step>
+
+### Write the program
+
+The `Redis` service is what you `yield*`. The layer from `RedisNode.layer` provides it.
+
+```ts twoslash title="main.ts"
+import { Effect, Option } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.set("greeting", "Hello from Effect", {
+    expiry: { type: "EX", value: 60 },
+  });
+
+  const greeting = yield* redis.get("greeting");
+  //    ^?
+  const visits = yield* redis.incr("visits");
+  //    ^?
+
+  return { greeting: Option.getOrElse(greeting, () => "Not found"), visits };
+});
+
+Effect.runPromise(program.pipe(Effect.provide(RedisLive))).then(console.log);
+```
+
+</Step>
+<Step>
+
+### Run it
+
+```sh
+node main.ts
+```
+
+</Step>
+<Step>
+
+### Read the output
+
+`visits` is a `bigint`, so it prints with an `n` suffix. It grows by one on every run.
+
+```text
+{ greeting: 'Hello from Effect', visits: 1n }
+```
+
+</Step>
+</Steps>
+
+<Callout type="info" title="Replies are Option and bigint">
+  `redis.get` returns `Option<string>`, and an empty string is a different value from a missing key. `redis.incr` and other counters return `bigint`, not `number`.
+</Callout>
+
+The layer connects when it is built. If the server is down or the URL is wrong, `Effect.provide(RedisLive)` fails at startup with a typed error, before the first command runs.

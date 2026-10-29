@@ -1,0 +1,171 @@
+---
+title: Overview
+description: Connect to Redis Cluster, route commands by hash slot, and reach sessions and streams through RedisCluster.
+keywords: [cluster, hash slot, MOVED, ASK, topology, sharding]
+---
+
+A Redis Cluster splits the keys across 16384 **hash slots**, and each primary owns a range of them. `layerCluster` discovers the topology, sends every command to the node that owns its slot, and follows `MOVED` and `ASK` redirects. The `Redis` API is the same as on a standalone server.
+
+**Example** (Connecting to a Cluster)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const ClusterLive = RedisNode.layerCluster({
+  url: "redis://localhost:7000",
+  cluster: {
+    seeds: [
+      { host: "localhost", port: 7001 },
+      { host: "localhost", port: 7002 },
+    ],
+  },
+});
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+  yield* redis.set("user:42", "Ada");
+  return yield* redis.get("user:42");
+});
+
+export const runnable = program.pipe(Effect.provide(ClusterLive));
+```
+
+The address in `url` or `endpoint` is the first seed, and `cluster.seeds` adds more. The layer asks the seeds for the topology when it is built, so an unreachable cluster fails at startup. `RedisBun.layerCluster` takes the same input. Cluster needs TCP endpoints: a Unix socket fails with `RedisConfigError`. Cluster is not available over Upstash HTTP.
+
+## Provided services
+
+The cluster layer provides `Redis`, `RedisCluster`, `CommandExecutor`, `BatchExecutor` and `RedisCredentials`.
+
+**Example** (The Services a Cluster Layer Provides)
+
+```ts twoslash
+import type { Layer } from "effect";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const ClusterLive = RedisNode.layerCluster({
+  url: "redis://localhost:7000",
+});
+
+type Provided = Layer.Success<typeof ClusterLive>;
+//   ^?
+```
+
+<Callout type="warn" title="No RedisSessions, RedisStreams or RedisPubSub">
+  The cluster layer does not provide `RedisSessions`, `RedisStreams`, `RedisScripts` or
+  `RedisPubSub`. A session lives on one node, so you pick the node with a key or a node id through
+  `RedisCluster`.
+</Callout>
+
+## Reaching a node with RedisCluster
+
+`RedisCluster` takes a **target**: `{ key }` routes to the node that owns the key's slot, and `{ node }` names a node by id.
+
+| Method                               | Purpose                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `withSession(target, body)`          | A leased session on that node, for `WATCH` and manual control |
+| `withBlockingSession(target, body)`  | A session on a blocking connection                            |
+| `scripts(target)`                    | `RedisScripts` for that node                                  |
+| `streams(target)`                    | `RedisStreams` for that node                                  |
+| `pubsub(target)`, `tracking(target)` | Subscriptions and tracking on that node                       |
+| `node(id)`, `admin(id)`              | Commands and `RedisAdmin` on one node                         |
+| `onPrimaries(command)`               | Run one command on every primary                              |
+| `topology`, `refresh`, `snapshot`    | Inspect and refresh the topology                              |
+
+**Example** (Running a Blocking Pop on the Node That Owns a Key)
+
+```ts twoslash
+import { Duration, Effect } from "effect";
+import { RedisCluster } from "@effect-kit/redis";
+
+export const nextJob = Effect.gen(function* () {
+  const cluster = yield* RedisCluster;
+
+  return yield* cluster.withBlockingSession({ key: "{jobs}:queue" }, (session) =>
+    session.blpop(["{jobs}:queue"], { blockFor: Duration.seconds(1) }),
+  );
+});
+```
+
+A session checks every command against its node. A command for a different slot fails with `ClusterError` where `reason` is `"cross-slot"` or `"session-route"`.
+
+`onPrimaries` returns a lazy `Stream` of `{ node, result }`, one per primary, in sequence. Each `result` is a `Result`, so one failed node does not stop the others. There is no atomicity and no retry.
+
+## Topology
+
+`cluster.topology` returns the current `ClusterTopology`: a `revision` and a list of shards, each with its `slots` ranges, `primary` and `replicas`. The layer refreshes it every `refreshIntervalMillis` and after a redirect. `cluster.refresh` forces a refresh.
+
+`keySlot(key)` computes the slot for a key. It applies hash tags, so `keySlot("{user:42}:name")` equals `keySlot("{user:42}:visits")`.
+
+## Options
+
+Pass these as `cluster` next to `url` or `endpoint`. The connection and session options at the top level apply to every node.
+
+<TypeTable
+  type={{
+    seeds: {
+      type: "ReadonlyArray<{ host: string; port: number }>",
+      description: "Extra nodes to ask for the topology. The first seed is the url or endpoint.",
+      required: false,
+    },
+    addressMap: {
+      type: "(address) => { host: string; port: number; serverName?: string }",
+      description:
+        "Translate node addresses, for NAT or a proxy. It does not change TLS identity unless you set serverName.",
+      required: false,
+    },
+    maxNodes: {
+      type: "number",
+      description: "Most nodes the client connects to.",
+      default: "64",
+      required: false,
+    },
+    maxRedirects: {
+      type: "number",
+      description: "Redirects followed for one command before it fails with redirect-limit.",
+      default: "8",
+      required: false,
+    },
+    maxOperations: {
+      type: "number",
+      description:
+        "Routed commands in flight at once. More fail with ClusterError and reason capacity.",
+      default: "1024",
+      required: false,
+    },
+    operationTimeoutMillis: {
+      type: "number",
+      description: "Time allowed for one routed operation.",
+      default: "30000",
+      required: false,
+    },
+    refreshIntervalMillis: {
+      type: "number",
+      description: "Time between background topology refreshes.",
+      default: "30000",
+      required: false,
+    },
+    discovery: {
+      type: '"auto" | "shards" | "slots"',
+      description:
+        "Which command reads the topology. auto uses CLUSTER SHARDS and falls back to CLUSTER SLOTS when the server lacks it.",
+      default: '"auto"',
+      required: false,
+    },
+    readPreference: {
+      type: '"primary" | "replica-preferred"',
+      description: "Where read-only keyed commands go.",
+      default: '"primary"',
+      required: false,
+    },
+    databaseCapability: {
+      type: '"db0" | "valkey-multi-db"',
+      description: "Whether the cluster allows a database other than 0.",
+      default: '"db0"',
+      required: false,
+    },
+  }}
+/>
+
+A `database` other than `0` fails with `ClusterError` and `reason: "database"` unless `databaseCapability` is `"valkey-multi-db"`, which Valkey 9.0 and later can be configured for.

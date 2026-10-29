@@ -1,0 +1,94 @@
+---
+title: Observability
+description: Turn on metrics and spans for Redis operations, and know what the package never records.
+keywords: [metrics, tracing, OpenTelemetry, spans, histogram]
+---
+
+`RedisTelemetry` records Effect metrics and, optionally, spans for calls made through the `Redis` service. It is off by default, and the package has no logging.
+
+## Enabling telemetry
+
+Merge `RedisTelemetry.layer` with your runtime layer. Metrics are on and tracing is off unless you say otherwise.
+
+**Example** (Enabling Metrics and Spans)
+
+```ts twoslash
+import { Layer } from "effect";
+import { RedisTelemetry } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+
+export const RedisObserved = Layer.merge(
+  RedisLive,
+  RedisTelemetry.layer({ metrics: true, tracing: true }),
+);
+```
+
+| Option    | Default | Meaning                                     |
+| --------- | ------- | ------------------------------------------- |
+| `metrics` | `true`  | Record the counters and the histogram below |
+| `tracing` | `false` | Create one client span per operation        |
+
+Without the layer, both are off and instrumented calls skip the work. Telemetry adds no service to the requirements of a command.
+
+The package does not export anything. Exporters for metrics and traces belong to your application, for example an OpenTelemetry layer.
+
+## Metrics
+
+Each operation is a `command`, a `pipeline` or a `transaction`. A pipeline or transaction counts once, not once per command inside it.
+
+| Metric                               | Type                                    | Attributes             |
+| ------------------------------------ | --------------------------------------- | ---------------------- |
+| `effect_redis.operations`            | Counter                                 | `operation`, `outcome` |
+| `effect_redis.operations.active`     | Counter, up on start and down on finish | `operation`            |
+| `effect_redis.operation.duration_ms` | Histogram                               | `operation`            |
+
+`outcome` is `success`, `failure`, `defect` or `interrupted`. The histogram boundaries are `0`, `0.1`, `0.5`, `1`, `2`, `5`, `10`, `50`, `100`, `500`, `1000`, `5000` and `30000` milliseconds.
+
+**Example** (Reading the Redis Metrics)
+
+```ts twoslash
+import { Effect, Metric } from "effect";
+
+export const redisMetrics = Effect.gen(function* () {
+  const metrics = yield* Metric.snapshot;
+  return metrics.filter((metric) => metric.id.startsWith("effect_redis."));
+});
+```
+
+## Spans
+
+With `tracing: true`, each operation runs in a span named `redis.command`, `redis.pipeline` or `redis.transaction`, with kind `client` and an `outcome` attribute. On failure the span ends with a fixed `RedisOperationFailure` value and the outcome, never your error.
+
+## What is never recorded
+
+Names and attributes never come from command arguments. The command name, keys and values are not recorded, so you cannot get per-command or per-key metrics from this layer.
+
+<Callout type="info" title="Only the Redis service is instrumented">
+  Calls on `Redis` are counted, including `execute`, `raw`, `redis.pipeline` and
+  `redis.transaction`. Sessions, Pub/Sub and Streams are not.
+</Callout>
+
+## Inspecting pools and subscriptions
+
+`RedisSessions` and `RedisPubSub` expose a `snapshot` effect that reports their current state without any telemetry setup.
+
+**Example** (Reading Pool and Subscription State)
+
+```ts twoslash
+import { Effect } from "effect";
+import { RedisPubSub, RedisSessions } from "@effect-kit/redis";
+
+export const state = Effect.gen(function* () {
+  const sessions = yield* RedisSessions;
+  const pubsub = yield* RedisPubSub;
+
+  const pool = yield* sessions.snapshot;
+  const subscriptions = yield* pubsub.snapshot;
+
+  return { leased: pool.leased, idle: pool.idle, listeners: subscriptions.listeners };
+});
+```
+
+`sessions.snapshot` reports `closed`, `waiting`, `leased`, `connections`, `idle`, `generations` and `retired`. `pubsub.snapshot` reports `generation`, `listeners`, `retiring`, `interests` and `retainedBytes`.

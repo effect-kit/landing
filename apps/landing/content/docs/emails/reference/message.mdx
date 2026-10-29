@@ -1,0 +1,84 @@
+---
+title: Message
+description: The EmailMessage schema, its address and attachment shapes, validation rules, and SendOptions.
+---
+
+`email.send` takes an `EmailMessage` and optional `SendOptions`. Messages are validated on every call, and unknown keys fail with `InvalidMessageError`.
+
+## `EmailMessage`
+
+| Field         | Type            | Rules                                            |
+| ------------- | --------------- | ------------------------------------------------ |
+| `from`        | `Address`       | Required.                                        |
+| `to`          | `Recipients`    | Required.                                        |
+| `cc`          | `Recipients`    | Optional.                                        |
+| `bcc`         | `Recipients`    | Optional.                                        |
+| `replyTo`     | `Recipients`    | Optional.                                        |
+| `subject`     | `string`        | Required. Not blank, no control characters.      |
+| `text`        | `string`        | Required if `html` is absent. Not blank, no NUL. |
+| `html`        | `string`        | Required if `text` is absent. Not blank, no NUL. |
+| `headers`     | `CustomHeaders` | Optional.                                        |
+| `attachments` | `Attachment[]`  | Optional.                                        |
+
+A message must have `text`, `html` or both. The bytes of attachments are copied when the message is accepted.
+
+## `EmailAddress`
+
+A bare ASCII address, up to 254 characters with a local part of up to 64. It has no control characters and no display name. `"Ada <ada@example.com>"` is not valid.
+
+## `Mailbox`
+
+An object with an address and an optional display name.
+
+| Field   | Type                | Description                                     |
+| ------- | ------------------- | ----------------------------------------------- |
+| `email` | `EmailAddress`      | The address.                                    |
+| `name`  | `string` (optional) | Display name. Not blank, no control characters. |
+
+## `Address`
+
+An `EmailAddress` string or a `Mailbox`.
+
+## `Recipients`
+
+One `Address` or a non-empty array of them. An empty array fails when the message is decoded.
+
+## `Attachment`
+
+| Field         | Type                | Rules                                                                                           |
+| ------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
+| `filename`    | `string`            | Not blank, no control characters.                                                               |
+| `content`     | `Uint8Array`        | The bytes. Paths and URLs are never read.                                                       |
+| `contentType` | `string`            | A `type/subtype` media type.                                                                    |
+| `contentId`   | `string` (optional) | No whitespace or angle brackets. Marks the attachment as inline. Must be unique in the message. |
+
+## `CustomHeaders`
+
+A record of header name to value.
+
+- Names use only letters, digits and the characters ``! # $ % & ' * + . ^ _ ` | ~ -``, and are unique ignoring case.
+- Values have no control characters.
+- These names are reserved: `from`, `sender`, `to`, `cc`, `bcc`, `reply-to`, `subject`, `date`, `message-id`, `mime-version`, `return-path`, `received`, `authentication-results`, `dkim-signature`, `authorization`, `proxy-authorization`, `host`, `idempotency-key`, `x-smtpapi`.
+- These prefixes are reserved: `content-`, `resent-`, `resend-`, `x-ses-`, `x-mc-`, `x-mailgun-`, `x-mailin-`, `x-pm-`.
+
+## `SendOptions`
+
+| Field            | Type                | Description                                                                                                 |
+| ---------------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `idempotencyKey` | `string` (optional) | Not blank, no control characters. Supported by four providers. See [Idempotency](/docs/emails/idempotency). |
+
+## `NormalizedEmailMessage`
+
+The `EmailMessage` an adapter receives. `from` is a `Mailbox`, and `to`, `cc`, `bcc` and `replyTo` are arrays of `Mailbox`. `EmailTest` also records this type.
+
+## `EmailRequest`
+
+One entry of `Email.sendMany`: `{ message: EmailMessage, options?: SendOptions }`.
+
+## `BatchOptions`
+
+| Field         | Type                | Description                           |
+| ------------- | ------------------- | ------------------------------------- |
+| `concurrency` | `number` (optional) | An integer from 1 to 1000. Default 5. |
+
+`Email.sendMany` takes up to 1,000 requests.

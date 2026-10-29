@@ -1,0 +1,70 @@
+---
+title: Sending many
+description: Send a list of messages with bounded concurrency and get one result per message.
+---
+
+`Email.sendMany` sends a list of requests and returns one `Result` per request, in input order. A message that fails does not stop the others.
+
+**Example** (Collecting Failures From a Batch)
+
+```ts twoslash
+import { Effect, Result } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const outcomes = yield* Email.sendMany([
+    //    ^?
+    {
+      message: {
+        from: "hello@example.com",
+        to: "ada@example.com",
+        subject: "Welcome",
+        text: "Your account is ready.",
+      },
+    },
+    {
+      message: {
+        from: "hello@example.com",
+        to: "grace@example.com",
+        subject: "Welcome",
+        text: "Your account is ready.",
+      },
+    },
+  ]);
+
+  const failed = outcomes.filter(Result.isFailure);
+  return failed.map((outcome) => outcome.failure.acceptance);
+});
+```
+
+Each request is an `EmailRequest`: a `message`, plus optional `options` with an `idempotencyKey`. `Email.sendMany` runs against whichever `Email` is provided, so it works with the test Layer too.
+
+## Concurrency
+
+Pass `BatchOptions` as the second argument. `concurrency` is an integer from 1 to 1000 and defaults to 5.
+
+**Example** (Sending Ten at a Time)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email, type EmailRequest } from "@effect-kit/emails";
+
+declare const requests: EmailRequest[];
+
+const program = Email.sendMany(requests, { concurrency: 10 });
+//    ^?
+```
+
+## Limits
+
+A batch holds at most 1,000 requests. An empty list is valid and returns an empty array.
+
+`Email.sendMany` fails with `BatchError` only when the input is invalid, before any request is made. `reason` is `"InvalidRequests"` for a non-array or more than 1,000 requests, and `"InvalidOptions"` for bad `BatchOptions`. Per-message errors never reach the error channel: they are failed results.
+
+A message that is invalid becomes a failed result with `acceptance: "notSubmitted"` and is not submitted.
+
+## What a batch is not
+
+A batch is a bounded loop over `email.send`. It is not atomic, it uses no provider batch API and it does not retry. It never generates idempotency keys: keys you set on a request are passed through.
+
+The results already contain each `acceptance`, so decide per result whether to [retry](/docs/emails/errors).

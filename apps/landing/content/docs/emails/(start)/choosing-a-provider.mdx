@@ -1,0 +1,94 @@
+---
+title: Choosing a provider
+description: Compare what each provider supports before you pick one.
+---
+
+All 16 providers share the `Email` service, but they do not support the same message features. The package checks the message against the provider's capabilities first, and fails with `UnsupportedFeatureError` before any request when a feature is missing.
+
+**Example** (Changing the Provider Without Changing the Program)
+
+```ts tab="Resend" tab-group="provider"
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Resend from "@effect-kit/emails/resend";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(Resend.layerConfig())));
+```
+
+```ts tab="Amazon SES" tab-group="provider"
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Ses from "@effect-kit/emails/ses";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(Ses.layerConfig())));
+```
+
+```ts tab="Postmark" tab-group="provider"
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Postmark from "@effect-kit/emails/postmark";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(Postmark.layerConfig())));
+```
+
+## What differs
+
+Every provider supports text, HTML, both together, cc, bcc and custom headers, except [Plunk](/docs/emails/providers/plunk). The rest of the differences:
+
+| Provider                  | Reply-to | Attachments | Inline images | Sender name | Idempotency        |
+| ------------------------- | -------- | ----------- | ------------- | ----------- | ------------------ |
+| `resend`                  | multiple | yes         | yes           | yes         | replay, 24 hours   |
+| `nodemailer`              | multiple | yes         | yes           | yes         | no                 |
+| `ses`                     | multiple | yes         | yes           | yes         | no                 |
+| `azure`                   | multiple | yes         | yes           | no          | no                 |
+| `postmark`                | multiple | yes         | yes           | yes         | no                 |
+| `sendgrid`                | one      | yes         | yes           | yes         | no                 |
+| `mailgun`                 | multiple | yes         | no            | yes         | no                 |
+| `mailersend`              | one      | no          | no            | yes         | no                 |
+| `brevo`                   | one      | no          | no            | yes         | reject, 30 minutes |
+| `mailtrap`                | one      | yes         | yes           | yes         | no                 |
+| `scaleway`                | multiple | yes         | no            | yes         | no                 |
+| `lettermint`              | multiple | yes         | yes           | yes         | replay, 24 hours   |
+| `eusend`                  | multiple | yes         | yes           | yes         | replay             |
+| `zeptomail`               | multiple | yes         | yes           | yes         | no                 |
+| `mailchimp-transactional` | multiple | yes         | no            | yes         | no                 |
+| `plunk`                   | none     | no          | no            | yes         | no                 |
+
+Only Resend, Lettermint, eusend and Brevo support idempotency keys. On any other provider, a message sent with an `idempotencyKey` fails with `UnsupportedFeatureError` before sending. Lettermint inline images need a content id that contains `@`.
+
+<Callout type="warn" title="Plunk is HTML only">
+  Plunk sends HTML with exactly one `to` address and no name. It has no text body, cc, bcc,
+  reply-to, headers or attachments, so any of those fail with `UnsupportedFeatureError`.
+</Callout>
+
+Read these at runtime from `email.capabilities`, and see the [provider overview](/docs/emails/providers) for the full matrix.

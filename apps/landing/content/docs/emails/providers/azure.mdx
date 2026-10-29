@@ -1,0 +1,136 @@
+---
+title: Azure Communication Services
+description: "Send email through Azure Communication Services Email with the @effect-kit/emails/azure Layer."
+---
+
+The `@effect-kit/emails/azure` subpath sends messages through [Azure Communication Services Email](https://learn.microsoft.com/azure/communication-services/concepts/email/email-overview) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @azure/communication-email@1.1.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Azure.layerConfig()` reads these variables:
+
+| Variable                        | Required | Value                                    |
+| ------------------------------- | -------- | ---------------------------------------- |
+| `AZURE_EMAIL_CONNECTION_STRING` | yes      | Communication Services connection string |
+
+**Example** (Sending a Message With Azure Communication Services Email)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Azure from "@effect-kit/emails/azure";
+
+const EmailLive = Azure.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Azure Communication Services Email account is allowed to send from.
+
+## Options
+
+`Azure.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    connectionString: {
+      type: "Redacted<string>",
+      description: "The Communication Services connection string.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "60 seconds",
+      required: false,
+    },
+    pollInterval: {
+      type: "Duration",
+      description: "How often the send operation is polled. Must be finite and positive.",
+      default: "1 second",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Azure Communication Services Email reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | no          | yes | yes | multiple | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- A display name on `from` (feature `senderName`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- Azure sends are long-running operations. The Layer starts the operation, polls it every `pollInterval` and resolves when it finishes, so `timeout` covers the whole operation and defaults to 60 seconds.
+- The send is accepted when the operation status is `Succeeded`. `Failed` or `Canceled` fails with `MessageRejectedError` and `acceptance: "rejected"`. Any other final status fails with `UnexpectedResponseError`.
+- The receipt's reference has kind `operationId`. Failures after the operation started carry that reference in `references`.
+- Azure takes the sender address only. A display name on `from` fails before sending with feature `senderName`. Set the sender display name in Azure.
+- The owned client is created with `maxRetries: 0`.
+
+## Using your own client
+
+`layerClient` takes any object with `beginSend(message, options)` that returns a poller with `pollUntilDone`, `stopPolling` and `getResult`, which an `EmailClient` does. `options` is optional and accepts `timeout` and `pollInterval`.
+
+**Example** (Borrowing a Azure Communication Services Email Client)
+
+```ts
+import { EmailClient } from "@azure/communication-email";
+import * as Azure from "@effect-kit/emails/azure";
+
+const client = new EmailClient("endpoint=https://example.communication.azure.com/;accesskey=fake");
+
+const EmailLive = Azure.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+Layer construction fails with `AzureConfigurationError`, whose `field` names the bad option. `layerClient` fails with it for the client options.
+
+| `field`            | Raised when                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `connectionString` | The SDK client could not be created from the connection string. |
+| `timeout`          | The timeout is not finite and positive.                         |
+| `pollInterval`     | The poll interval is not finite and positive.                   |
+
+| Azure failure                                                  | Reason                                            |
+| -------------------------------------------------------------- | ------------------------------------------------- |
+| Operation ends `Failed` or `Canceled`                          | `MessageRejectedError` (`acceptance: "rejected"`) |
+| Operation id changes while polling, or an unknown final status | `UnexpectedResponseError`                         |
+| `timeout` elapses                                              | `TimeoutError`                                    |
+| `TypeError` or `DOMException` from the SDK                     | `TransportError`                                  |
+
+REST errors use the HTTP status with the shared mapping. Once an operation id is known, the `acceptance` of a failure is `unknown` so you can reconcile it. Kept `providerCode` values are `ServiceUnavailable` and `REQUEST_SEND_ERROR`.

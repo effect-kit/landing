@@ -1,0 +1,117 @@
+---
+title: Idempotency
+description: Pass an idempotencyKey so a repeated send does not deliver the same message twice, on the providers that support it.
+keywords: ["idempotency key", "duplicate emails", "IdempotencyConflictError"]
+---
+
+To send the same message again without delivering it twice, pass an `idempotencyKey` in the second argument of `email.send`. The provider uses the key to recognize the repeat.
+
+**Example** (Sending With a Key on Resend)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Resend from "@effect-kit/emails/resend";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Your receipt",
+      text: "Thanks for your order.",
+    },
+    { idempotencyKey: "receipt/order-1042" },
+  );
+}).pipe(Effect.provide(Resend.layerConfig()));
+```
+
+Use one key per message, derived from something stable such as an order id. A key made fresh on each attempt protects nothing.
+
+## Which providers support it
+
+Four providers take a key. Every other provider fails the send before any request.
+
+| Provider     | Mode     | Retention    | Key rules                                       |
+| ------------ | -------- | ------------ | ----------------------------------------------- |
+| `resend`     | `replay` | 24 hours     | At most 256 characters.                         |
+| `lettermint` | `replay` | 24 hours     | 1 to 255 printable ASCII characters, not blank. |
+| `eusend`     | `replay` | not declared | 1 to 255 printable ASCII characters, not blank. |
+| `brevo`      | `reject` | 30 minutes   | Must be a UUID.                                 |
+
+The modes differ in what a repeated key does:
+
+- **replay**: the provider treats the repeat as the same send and does not deliver a second message.
+- **reject**: the provider refuses the repeat, and the send fails with `IdempotencyConflictError`.
+
+`retention` in `email.capabilities.idempotency` is the window the package declares. It is a hint for your code. The package does not enforce it.
+
+A key that breaks the rules fails with `InvalidMessageError` and `acceptance: "notSubmitted"`, with `idempotencyKey` in `paths`. Brevo also rejects a custom header named `idempotencyKey`, because the package sends the key under that name.
+
+## Handling a conflict
+
+`IdempotencyConflictError` means the provider saw the key before and did not accept the new request as a fresh send. The package maps these provider signals to it:
+
+| Provider     | Signal                                                         |
+| ------------ | -------------------------------------------------------------- |
+| `resend`     | `invalid_idempotent_request`, `concurrent_idempotent_requests` |
+| `lettermint` | A `ConflictError` from the SDK.                                |
+| `eusend`     | The `CONFLICT` code.                                           |
+| `brevo`      | The `duplicate_parameter` code.                                |
+
+**Example** (Treating a Repeated Key as Already Sent)
+
+```ts
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const sendReceipt = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Your receipt",
+      text: "Thanks for your order.",
+    },
+    { idempotencyKey: "receipt/order-1042" },
+  );
+}).pipe(Effect.catchReason("EmailError", "IdempotencyConflictError", () => Effect.void));
+```
+
+On Resend a conflict arrives with `acceptance: "unknown"`, so a conflict is not proof that the first send succeeded.
+
+## Providers without support
+
+An `idempotencyKey` on a provider with mode `unsupported` fails before any request, with `UnsupportedFeatureError` and `feature: "idempotency"`.
+
+<Callout type="warn" title="The key is not ignored">
+  Passing a key to Postmark, SES or any provider outside the table above does not degrade to a plain
+  send. It fails with `acceptance: "notSubmitted"`. Read `email.capabilities.idempotency.mode`
+  first, as in [Capabilities](/docs/emails/capabilities#reading-capabilities).
+</Callout>
+
+## Keys in batches
+
+`Email.sendMany` keeps the key you set on each request and never generates one. A request without a key is sent without one.
+
+**Example** (Keying Each Message in a Batch)
+
+```ts
+import { Email } from "@effect-kit/emails";
+
+const orders = ["1042", "1043"];
+
+const program = Email.sendMany(
+  orders.map((id) => ({
+    message: {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: `Receipt ${id}`,
+      text: "Thanks for your order.",
+    },
+    options: { idempotencyKey: `receipt/order-${id}` },
+  })),
+);
+```

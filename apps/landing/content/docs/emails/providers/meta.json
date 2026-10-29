@@ -1,0 +1,24 @@
+{
+  "title": "All providers",
+  "icon": "providers",
+  "defaultOpen": false,
+  "pages": [
+    "index",
+    "resend",
+    "ses",
+    "postmark",
+    "sendgrid",
+    "mailgun",
+    "nodemailer",
+    "brevo",
+    "mailersend",
+    "mailtrap",
+    "mailchimp-transactional",
+    "azure",
+    "zeptomail",
+    "scaleway",
+    "lettermint",
+    "plunk",
+    "eusend"
+  ]
+}

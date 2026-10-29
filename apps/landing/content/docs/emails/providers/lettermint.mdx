@@ -1,0 +1,156 @@
+---
+title: Lettermint
+description: "Send email through Lettermint with the @effect-kit/emails/lettermint Layer."
+---
+
+The `@effect-kit/emails/lettermint` subpath sends messages through [Lettermint](https://lettermint.co/docs) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect lettermint@3.2.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Lettermint.layerConfig()` reads these variables:
+
+| Variable                   | Required | Value         |
+| -------------------------- | -------- | ------------- |
+| `LETTERMINT_SENDING_TOKEN` | yes      | Sending token |
+
+**Example** (Sending a Message With Lettermint)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Lettermint from "@effect-kit/emails/lettermint";
+
+const EmailLive = Lettermint.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Lettermint account is allowed to send from.
+
+## Options
+
+`Lettermint.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    sendingToken: {
+      type: "Redacted<string>",
+      description: "The sending token. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    sandbox: {
+      type: "boolean",
+      description:
+        "Run as the sandbox. Changes the provider name to lettermint/sandbox and requires responses to report the sandbox flag.",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Lettermint reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency      |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ---------------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | replay, 24 hours |
+
+Every message feature is supported, so no message fails the capability check.
+
+## Idempotency
+
+Mode `replay`, with a retention of 24 hours. The package passes the key to Lettermint as the SDK's `idempotencyKey` option.
+
+The key must be 1 to 255 printable ASCII characters and not blank, otherwise the send fails with `InvalidMessageError` (path `idempotencyKey`) and `acceptance: "notSubmitted"`. A conflict from Lettermint fails with `IdempotencyConflictError`.
+
+**Example** (Sending With an Idempotency Key)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Welcome",
+      text: "Your account is ready.",
+    },
+    { idempotencyKey: "welcome-ada-2026-10-29" },
+  );
+});
+```
+
+## Provider notes
+
+- With `sandbox: true` the provider name becomes `lettermint/sandbox`, and a response that does not report the sandbox flag fails with `UnexpectedResponseError`. Without it, a response that reports the flag fails the same way.
+- Inline images need a fully qualified content id. A `contentId` without `@` fails with `InvalidMessageError` (path `attachments`) before sending, because Lettermint would otherwise append `@lm` and change the id you chose.
+- A send is accepted when Lettermint answers with status `pending`.
+
+## Using your own client
+
+`layerClient` takes any object with `emails.send(message, { signal, timeout, idempotencyKey })`, which a `Lettermint` client has. `options` is optional and accepts `timeout` and `sandbox`.
+
+**Example** (Borrowing a Lettermint Client)
+
+```ts
+import { Lettermint as LettermintSdk } from "lettermint";
+import * as Lettermint from "@effect-kit/emails/lettermint";
+
+const client = new LettermintSdk({ sendingToken: "fake-token" });
+
+const EmailLive = Lettermint.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. For a sandbox client, pass `{ sandbox: true }` so the provider name and the response check match.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "lettermint"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`        | Raised when                                              |
+| -------------- | -------------------------------------------------------- |
+| `timeout`      | The timeout is not finite and positive.                  |
+| `token`        | The sending token is not printable ASCII without spaces. |
+| `sendingToken` | The SDK client could not be created from the token.      |
+
+| Lettermint failure                  | Reason                                               |
+| ----------------------------------- | ---------------------------------------------------- |
+| SDK conflict error                  | `IdempotencyConflictError`                           |
+| SDK rate limit error                | `RateLimitedError`, with `retryAfter` from the SDK   |
+| SDK configuration error             | `AuthenticationError` (`acceptance: "notSubmitted"`) |
+| SDK validation error                | `InvalidMessageError` (`acceptance: "notSubmitted"`) |
+| SDK timeout error                   | `TimeoutError`                                       |
+| SDK connection error                | `TransportError`                                     |
+| SDK unexpected response or redirect | `UnexpectedResponseError`                            |
+
+Other API errors use their HTTP status with the shared mapping.

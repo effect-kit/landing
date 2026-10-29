@@ -1,0 +1,51 @@
+---
+title: Bitmaps
+description: Look up the bit commands on strings, including bitfield operations and their reply types.
+---
+
+Bitmap commands treat a string as an array of bits. They live on strings, so the keys are ordinary string keys.
+
+**Example** (Tracking Daily Activity)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const before = yield* redis.setbit("active:2026-10-29", 42, 1);
+  //    ^?
+  const active = yield* redis.getbit("active:2026-10-29", 42);
+  //    ^?
+  const total = yield* redis.bitcount("active:2026-10-29");
+  //    ^?
+
+  return { before, active, total };
+});
+```
+
+`setbit` returns the previous bit and `getbit` returns the bit, both typed as `0 | 1`. Counts and positions are `bigint`.
+
+## Methods
+
+| Method             | Command       | Reply type                  | Purpose                                                 |
+| ------------------ | ------------- | --------------------------- | ------------------------------------------------------- |
+| `redis.setbit`     | `SETBIT`      | `0 \| 1`                    | Set the bit at an offset and return its previous value. |
+| `redis.getbit`     | `GETBIT`      | `0 \| 1`                    | Read the bit at an offset.                              |
+| `redis.bitcount`   | `BITCOUNT`    | `bigint`                    | Count the set bits, optionally within a range.          |
+| `redis.bitpos`     | `BITPOS`      | `bigint`                    | Find the first bit set to 0 or 1.                       |
+| `redis.bitop`      | `BITOP`       | `bigint`                    | Combine bitmaps into a destination key.                 |
+| `redis.bitfield`   | `BITFIELD`    | `readonly Option<bigint>[]` | Read and write integer fields in a bitmap.              |
+| `redis.bitfieldRo` | `BITFIELD_RO` | `readonly bigint[]`         | Read integer fields without writing.                    |
+
+## Option types
+
+- `BitRange` for `bitcount`: `{ start: number | bigint; end: number | bigint; unit?: "BYTE" | "BIT" }`.
+- `BitPositionRange` for `bitpos`: `{ start: number | bigint; end?: number | bigint; unit?: "BYTE" | "BIT" }`.
+- `BitOperation` for `bitop` is `"AND" | "OR" | "XOR" | "NOT" | "DIFF" | "DIFF1" | "ANDOR" | "ONE"`.
+- `BitfieldRead` is `{ operation: "GET"; encoding; offset }`.
+- `BitfieldOperation` is a `BitfieldRead` or a write `{ operation: "SET" | "INCRBY"; encoding; offset; value; overflow?: "WRAP" | "SAT" | "FAIL" }`.
+
+`encoding` is `{ signed: true; bits: number } | { signed: false; bits: number }`, and `offset` is a number or `{ index: number }`.

@@ -1,0 +1,138 @@
+---
+title: Mailtrap
+description: "Send email through Mailtrap with the @effect-kit/emails/mailtrap Layer."
+---
+
+The `@effect-kit/emails/mailtrap` subpath sends messages through [Mailtrap](https://docs.mailtrap.io) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect mailtrap@5.0.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+Mailtrap is the one provider whose `layerConfig` has no default Config. You pass one, so the package reads no variables by itself. The example below reads these:
+
+| Variable         | Value                                                                |
+| ---------------- | -------------------------------------------------------------------- |
+| `MAILTRAP_TOKEN` | API token. The name is chosen in the example, the package reads none |
+| `MAILTRAP_MODE`  | `production` or `bulk`. The name is chosen in the example            |
+
+**Example** (Sending a Message With Mailtrap)
+
+```ts twoslash
+import { Config, ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Mailtrap from "@effect-kit/emails/mailtrap";
+
+const EmailLive = Mailtrap.layerConfig(
+  Config.all({
+    token: Config.Redacted("MAILTRAP_TOKEN"),
+    mode: Config.Literals(["production", "bulk"], "MAILTRAP_MODE"),
+  }),
+).pipe(Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())));
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Mailtrap account is allowed to send from.
+
+## Options
+
+`Mailtrap.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    token: {
+      type: "Redacted<string>",
+      description: "The API token. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    mode: {
+      type: '"production" | "bulk" | "sandbox"',
+      description: "Which Mailtrap sending stream to use.",
+      required: true,
+    },
+    inboxId: {
+      type: "number",
+      description:
+        "Test inbox id. Required, as a positive integer, when mode is sandbox. Not allowed otherwise.",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Mailtrap reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | one      | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- More than one `replyTo` address (feature `multipleReplyTo`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- `mode` selects the stream and changes the provider name on receipts and errors: `mailtrap` for `production`, `mailtrap/bulk` for `bulk`, `mailtrap/sandbox` for `sandbox`.
+- `sandbox` delivers to a Mailtrap test inbox and needs `inboxId`. `production` and `bulk` reject an `inboxId`.
+- Mailtrap takes one reply-to address. A second `replyTo` address fails before sending with feature `multipleReplyTo`.
+- The owned client's keep-alive agents are destroyed when the Layer's scope closes.
+
+## Using your own client
+
+`layerClient` takes any object with `send(message)`, which a `MailtrapClient` has. Its `options` are required, because they carry the `mode` that names the provider.
+
+**Example** (Borrowing a Mailtrap Client)
+
+```ts
+import { MailtrapClient } from "mailtrap";
+import * as Mailtrap from "@effect-kit/emails/mailtrap";
+
+const client = new MailtrapClient({ token: "fake-token" });
+
+const EmailLive = Mailtrap.layerClient(client, { mode: "production" });
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy. Pass the same `mode` you built the client for. The package does not inspect a borrowed client.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "mailtrap"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                                                       |
+| --------- | --------------------------------------------------------------------------------- |
+| `timeout` | The timeout is not finite and positive.                                           |
+| `token`   | The token is not printable ASCII without spaces.                                  |
+| `mode`    | The mode is not `production`, `sandbox` or `bulk`.                                |
+| `inboxId` | Sandbox mode without a positive integer inbox id, or an inbox id in another mode. |
+
+Send failures use the HTTP status with the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`. See [Errors](/docs/emails/errors).

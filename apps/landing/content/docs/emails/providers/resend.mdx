@@ -1,0 +1,156 @@
+---
+title: Resend
+description: "Send email through Resend with the @effect-kit/emails/resend Layer."
+---
+
+The `@effect-kit/emails/resend` subpath sends messages through [Resend](https://resend.com/docs) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect resend@6.34.1
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Resend.layerConfig()` reads these variables:
+
+| Variable         | Required | Value   |
+| ---------------- | -------- | ------- |
+| `RESEND_API_KEY` | yes      | API key |
+
+**Example** (Sending a Message With Resend)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Resend from "@effect-kit/emails/resend";
+
+const EmailLive = Resend.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Resend account is allowed to send from.
+
+## Options
+
+`Resend.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    baseUrl: {
+      type: "URL",
+      description: "API origin. Must be http or https with no credentials, query or fragment.",
+      default: "https://api.resend.com",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Resend reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency      |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ---------------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | replay, 24 hours |
+
+Every message feature is supported, so no message fails the capability check.
+
+## Idempotency
+
+Mode `replay`, with a retention of 24 hours. The package passes the key to Resend as the SDK's `idempotencyKey` option. A key longer than 256 characters fails with `InvalidMessageError` (path `idempotencyKey`) before sending.
+
+When Resend reports `invalid_idempotent_request` or `concurrent_idempotent_requests`, the send fails with `IdempotencyConflictError` and `acceptance: "unknown"`.
+
+**Example** (Sending With an Idempotency Key)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send(
+    {
+      from: "hello@example.com",
+      to: "ada@example.com",
+      subject: "Welcome",
+      text: "Your account is ready.",
+    },
+    { idempotencyKey: "welcome-ada-2026-10-29" },
+  );
+});
+```
+
+## Provider notes
+
+The receipt's `requestId` comes from the `x-request-id` response header when Resend returns one.
+
+## Using your own client
+
+`layerClient` takes any object with `emails.send(message, { signal, idempotencyKey })`, which the Resend SDK client has. `options` is optional.
+
+**Example** (Borrowing a Resend Client)
+
+```ts
+import { Resend as ResendSdk } from "resend";
+import * as Resend from "@effect-kit/emails/resend";
+
+const client = new ResendSdk("re_fake_key");
+
+const EmailLive = Resend.layerClient(client);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+Layer construction fails with `ResendConfigurationError`, whose `field` names the bad option. `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                                              |
+| --------- | ------------------------------------------------------------------------ |
+| `apiKey`  | The key is not printable ASCII without spaces.                           |
+| `baseUrl` | The URL is not http or https, or has credentials, a query or a fragment. |
+| `timeout` | The timeout is not finite and positive.                                  |
+
+| Resend response                                                                                                                                                          | Reason                     | `acceptance` |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | ------------ |
+| Status 500 or above, `service_unavailable`, `internal_server_error`                                                                                                      | `ProviderUnavailableError` | `unknown`    |
+| `invalid_idempotent_request`, `concurrent_idempotent_requests`                                                                                                           | `IdempotencyConflictError` | `unknown`    |
+| Status 401, `missing_api_key`, `invalid_api_key`                                                                                                                         | `AuthenticationError`      | `rejected`   |
+| `daily_quota_exceeded`, `monthly_quota_exceeded`, `email_above_quota`                                                                                                    | `QuotaExceededError`       | `rejected`   |
+| Status 403, `restricted_api_key`, `invalid_permission`, `suspended_api_key`, `invalid_access`, `security_error`                                                          | `PermissionDeniedError`    | `rejected`   |
+| Status 429, `rate_limit_exceeded`                                                                                                                                        | `RateLimitedError`         | `rejected`   |
+| `validation_error`, `invalid_idempotency_key`, `invalid_attachment`, `invalid_from_address`, `invalid_parameter`, `missing_required_field`, `missing_required_parameter` | `InvalidMessageError`      | `rejected`   |
+| `application_error` with no status                                                                                                                                       | `TransportError`           | `unknown`    |
+| Anything else                                                                                                                                                            | `ProviderError`            | `unknown`    |
+
+`retryAfter` is read from the `retry-after` header on rate limit, quota and unavailable failures. The Resend error name is kept as `providerCode` when it is one of the names above and the status as `statusCode`.

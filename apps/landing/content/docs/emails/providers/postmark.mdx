@@ -1,0 +1,133 @@
+---
+title: Postmark
+description: "Send email through Postmark with the @effect-kit/emails/postmark Layer."
+---
+
+The `@effect-kit/emails/postmark` subpath sends messages through [Postmark](https://postmarkapp.com/developer) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect postmark@5.1.0
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`Postmark.layerConfig()` reads these variables:
+
+| Variable                | Required | Value            |
+| ----------------------- | -------- | ---------------- |
+| `POSTMARK_SERVER_TOKEN` | yes      | Server API token |
+
+**Example** (Sending a Message With Postmark)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Postmark from "@effect-kit/emails/postmark";
+
+const EmailLive = Postmark.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your Postmark account is allowed to send from.
+
+## Options
+
+`Postmark.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    serverToken: {
+      type: "Redacted<string>",
+      description: "The server API token. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    messageStream: {
+      type: "string",
+      description:
+        "Message stream id sent with every message. Letters, digits, underscores and hyphens only.",
+      required: false,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+Postmark reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | multiple | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- Set `messageStream` to send through a stream other than the server's default. It is sent as `MessageStream` on every message, so it also applies to `layerClient` through `options`.
+- A Postmark `ErrorCode` other than `0` in a successful response fails the send with `acceptance: "rejected"`.
+
+## Using your own client
+
+`layerClient` takes any object with `sendEmail(message)`, which a `ServerClient` has. `options` is optional and accepts `timeout` and `messageStream`.
+
+**Example** (Borrowing a Postmark Client)
+
+```ts
+import { ServerClient } from "postmark";
+import * as Postmark from "@effect-kit/emails/postmark";
+
+const client = new ServerClient("fake-server-token");
+
+const EmailLive = Postmark.layerClient(client, { messageStream: "outbound" });
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "postmark"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`         | Raised when                                                                    |
+| --------------- | ------------------------------------------------------------------------------ |
+| `timeout`       | The timeout is not finite and positive.                                        |
+| `token`         | The server token is not printable ASCII without spaces.                        |
+| `messageStream` | The stream id has characters outside letters, digits, underscores and hyphens. |
+
+| Postmark failure                                      | Reason                 |
+| ----------------------------------------------------- | ---------------------- |
+| `InactiveRecipientsError`                             | `MessageRejectedError` |
+| SDK error with status 0 whose name contains `Timeout` | `TimeoutError`         |
+| SDK error with status 0 otherwise                     | `TransportError`       |
+
+The SDK error's `statusCode` and `code` become `statusCode` and `providerCode`. Postmark codes kept as `providerCode` are `0`, `10`, `401`, `406` and `429`.
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors).

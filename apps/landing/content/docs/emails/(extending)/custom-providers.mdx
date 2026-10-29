@@ -1,0 +1,100 @@
+---
+title: Custom providers
+description: Wrap any delivery service in an EmailAdapter and get the same validation, capability checks, receipts and spans as the built-in providers.
+keywords: ["EmailAdapter", "Email.make", "adapter"]
+---
+
+To support a provider the package does not ship, write an `EmailAdapter` and pass it to `Email.make`. `Email.make` returns an `EmailService`, and `Layer.succeed(Email, service)` turns it into a layer.
+
+**Example** (An Adapter for a Hypothetical HTTP API)
+
+```ts twoslash
+import { Effect, Layer } from "effect";
+import { Email, EmailError, TransportError } from "@effect-kit/emails";
+import type { EmailAdapter } from "@effect-kit/emails";
+
+const adapter: EmailAdapter = {
+  provider: "acme",
+  capabilities: {
+    text: true,
+    html: true,
+    htmlAndText: true,
+    senderName: true,
+    cc: false,
+    bcc: false,
+    replyTo: "none",
+    headers: false,
+    attachments: false,
+    inlineAttachments: false,
+    idempotency: { mode: "unsupported" },
+  },
+  send: (message) =>
+    Effect.tryPromise({
+      try: async () => {
+        const response = await fetch("https://api.acme.test/send", {
+          method: "POST",
+          body: JSON.stringify({
+            from: message.from.email,
+            to: message.to.map((mailbox) => mailbox.email),
+            subject: message.subject,
+            text: message.text,
+            html: message.html,
+          }),
+        });
+        const body = (await response.json()) as { id: string };
+        return {
+          provider: "acme",
+          status: "accepted" as const,
+          references: [{ kind: "providerMessageId" as const, value: body.id }],
+        };
+      },
+      catch: () =>
+        new EmailError({
+          provider: "acme",
+          operation: "send",
+          acceptance: "unknown",
+          reason: new TransportError(),
+        }),
+    }),
+};
+
+export const AcmeLayer = Layer.succeed(Email, Email.make(adapter));
+```
+
+Code that uses `Email` does not change. Provide `AcmeLayer` where you would provide a built-in provider layer.
+
+## What `Email.make` adds
+
+The adapter only submits. `Email.make` wraps it so that every send, in this order:
+
+1. Validates the message and rejects unknown keys with `InvalidMessageError`.
+2. Checks the message against your `capabilities` and fails with `UnsupportedFeatureError`.
+3. Calls your `send` with a `NormalizedEmailMessage` and the decoded `SendOptions`.
+4. Validates the receipt you return.
+5. Records the `Email.send` span described in [Observability](/docs/emails/observability).
+
+The adapter never sees a message that failed steps 1 or 2.
+
+## Adapter input
+
+`message` is a `NormalizedEmailMessage`. Compared with what callers pass, `from` is always a `Mailbox` object, and `to`, `cc`, `bcc` and `replyTo` are always arrays of `Mailbox`. Attachment bytes are private copies.
+
+`capabilities` must describe what your adapter honors, because step 2 trusts it. The schema also requires `text` or `html` to be true, requires `text` and `html` both true when `htmlAndText` is, and requires `attachments` when `inlineAttachments` is.
+
+## Failing and returning receipts
+
+Return failures as `EmailError` and set `acceptance` truthfully. The rules in [Errors and retries](/docs/emails/errors) apply: use `notSubmitted` only when nothing left your process, `rejected` when the provider refused, and `unknown` otherwise.
+
+`Email.make` fails a send with `UnexpectedResponseError` and `acceptance: "unknown"` if the receipt:
+
+- does not decode as a `SendReceipt`,
+- names a different `provider` than the adapter,
+- lists a recipient `index` that is out of range for its `role`.
+
+A `SendReceipt` with status `partiallyAccepted` must list at least one accepted and one rejected recipient. A receipt with status `accepted` must list none rejected.
+
+<Callout type="warn" title="Invalid configuration throws">
+  `Email.make` throws a `TypeError` synchronously if `provider` or `capabilities` is invalid. A
+  provider name starts with a letter, digit or `@` and contains only letters, digits and `@ . _ /
+  -`, up to 128 characters.
+</Callout>

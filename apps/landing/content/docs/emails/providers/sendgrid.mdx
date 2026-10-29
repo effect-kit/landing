@@ -1,0 +1,123 @@
+---
+title: SendGrid
+description: "Send email through SendGrid with the @effect-kit/emails/sendgrid Layer."
+---
+
+The `@effect-kit/emails/sendgrid` subpath sends messages through [SendGrid](https://www.twilio.com/docs/sendgrid) and provides the `Email` service.
+
+## Installation
+
+```package-install
+@effect-kit/emails effect @sendgrid/mail@8.1.6
+```
+
+The SDK is a pinned optional peer. It is needed only when you import this subpath.
+
+## Setup
+
+`SendGrid.layerConfig()` reads these variables:
+
+| Variable           | Required | Value   |
+| ------------------ | -------- | ------- |
+| `SENDGRID_API_KEY` | yes      | API key |
+
+**Example** (Sending a Message With SendGrid)
+
+```ts twoslash
+import { ConfigProvider, Effect, Layer } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as SendGrid from "@effect-kit/emails/sendgrid";
+
+const EmailLive = SendGrid.layerConfig().pipe(
+  Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
+);
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
+
+Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
+```
+
+Use a `from` address your SendGrid account is allowed to send from.
+
+## Options
+
+`SendGrid.layer` takes these options. `layerConfig` builds the same object from a `Config`.
+
+<TypeTable
+  type={{
+    apiKey: {
+      type: "Redacted<string>",
+      description: "The API key. Must be printable ASCII with no spaces.",
+      required: true,
+    },
+    timeout: {
+      type: "Duration",
+      description:
+        "Time allowed for one send. Must be finite and positive. When it elapses the send fails with TimeoutError.",
+      default: "30 seconds",
+      required: false,
+    },
+  }}
+/>
+
+## Capabilities
+
+SendGrid reports this in `email.capabilities`:
+
+| Text | HTML | Both | Sender name | Cc  | Bcc | Reply-to | Headers | Attachments | Inline images | Idempotency |
+| ---- | ---- | ---- | ----------- | --- | --- | -------- | ------- | ----------- | ------------- | ----------- |
+| yes  | yes  | yes  | yes         | yes | yes | one      | yes     | yes         | yes           | no          |
+
+These fail with `UnsupportedFeatureError` and `acceptance: "notSubmitted"` before any request:
+
+- More than one `replyTo` address (feature `multipleReplyTo`).
+- An `idempotencyKey` (feature `idempotency`).
+
+## Idempotency
+
+Not supported. A key fails with `UnsupportedFeatureError` before sending.
+
+## Provider notes
+
+- SendGrid takes one reply-to address. A second `replyTo` address fails before sending with feature `multipleReplyTo`.
+- A send is accepted only on an HTTP 202 response. Any other success status fails with `UnexpectedResponseError`. The receipt's reference is the `x-message-id` response header, and `references` is empty when the header is missing.
+
+## Using your own client
+
+`layerClient` takes any object with `send(message)`, which the `@sendgrid/mail` mail service has. `options` is optional.
+
+**Example** (Borrowing a SendGrid Client)
+
+```ts
+import sgMail from "@sendgrid/mail";
+import * as SendGrid from "@effect-kit/emails/sendgrid";
+
+sgMail.setApiKey("SG.fake_key");
+
+const EmailLive = SendGrid.layerClient(sgMail);
+```
+
+You own a borrowed client. The Layer never closes it, and the client keeps its own retry, timeout and logging policy.
+
+## Errors
+
+`ProviderConfigurationError` carries `provider: "sendgrid"` and a `field` naming the bad option. Layer construction fails with it, and `layerClient` fails with it for the client options.
+
+| `field`   | Raised when                                        |
+| --------- | -------------------------------------------------- |
+| `timeout` | The timeout is not finite and positive.            |
+| `token`   | The API key is not printable ASCII without spaces. |
+
+| SendGrid failure                | Reason                                  |
+| ------------------------------- | --------------------------------------- |
+| SDK error with a numeric `code` | Mapped from that code as an HTTP status |
+
+Any other HTTP status uses the shared mapping: 401 is `AuthenticationError`, 403 `PermissionDeniedError`, 429 `RateLimitedError`, 400 and 422 `InvalidMessageError`, 5xx `ProviderUnavailableError`, and anything else `ProviderError`. `acceptance` is `rejected` for a 4xx status other than 409 and `unknown` otherwise. See [Errors](/docs/emails/errors). A network failure with no status is `TransportError`, and `ETIMEDOUT` or `ECONNABORTED` is `TimeoutError`, both with `acceptance: "unknown"`.

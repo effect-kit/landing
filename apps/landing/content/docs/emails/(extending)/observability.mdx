@@ -1,0 +1,58 @@
+---
+title: Observability
+description: Read the Email.send span, its attributes and outcomes, and what the package never records.
+keywords: ["tracing", "OpenTelemetry", "span", "attributes"]
+---
+
+Every call to `email.send` runs inside one span named `Email.send`. The package records the span and nothing else: there are no metrics and no logs. You choose the exporter.
+
+**Example** (Nesting the Send Span Under Your Own)
+
+```ts
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const sendWelcome = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+}).pipe(Effect.withSpan("signup.welcome-email"));
+```
+
+`Email.send` appears as a child of `signup.welcome-email`, with the attributes below.
+
+## Attributes
+
+| Attribute                | Value                                                    |
+| ------------------------ | -------------------------------------------------------- |
+| `email.provider`         | The provider name, such as `resend`.                     |
+| `email.operation`        | `"send"`.                                                |
+| `email.recipient_count`  | Count of `to`, `cc` and `bcc` addresses together.        |
+| `email.attachment_count` | Count of attachments.                                    |
+| `email.outcome`          | How the call ended. See below.                           |
+| `email.reason`           | The `_tag` of the failure reason. Set on a failure only. |
+| `email.acceptance`       | The failure's `acceptance`. Set on a failure only.       |
+
+`email.provider` and `email.operation` are set first. The two counts are set once the message passes validation and capability checks, so a send that fails those checks has no counts.
+
+`email.outcome` takes one of five values:
+
+| Value               | Meaning                                                    |
+| ------------------- | ---------------------------------------------------------- |
+| `accepted`          | The provider accepted the message.                         |
+| `partiallyAccepted` | The provider accepted some recipients and rejected others. |
+| `failed`            | The send failed with an `EmailError`.                      |
+| `defect`            | The send died with an unexpected error.                    |
+| `interrupted`       | The fiber was interrupted.                                 |
+
+## What is never recorded
+
+Message content, addresses, subjects, header values, idempotency keys and raw SDK errors stay out of spans. The package keeps provider codes only from a reviewed list, and drops the rest.
+
+## Batches
+
+`Email.sendMany` calls `email.send` for each request, so a batch produces one `Email.send` span per message and no span for the batch itself.

@@ -2,5 +2,19 @@
   "title": "Emails",
   "description": "Typed email delivery",
   "root": true,
-  "pages": ["index", "..."]
+  "pages": [
+    "index",
+    "---[rocket]Getting started---",
+    "...(start)",
+    "---[send]Sending---",
+    "...(sending)",
+    "---[shield]Reliability---",
+    "...(reliability)",
+    "---[ops]Testing and extending---",
+    "...(extending)",
+    "---[providers]Providers---",
+    "providers",
+    "---[reference]Reference---",
+    "...reference"
+  ]
 }

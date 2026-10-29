@@ -1,0 +1,80 @@
+---
+title: Attachments
+description: Attach files and inline images to a message as bytes.
+---
+
+An attachment is a `Uint8Array` with a file name and a content type. The package copies the bytes and never reads file paths or fetches URLs, so load the file yourself.
+
+**Example** (Attaching a Text File)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "billing@example.com",
+    to: "ada@example.com",
+    subject: "Invoice 1042",
+    text: "Your invoice is attached.",
+    attachments: [
+      {
+        filename: "invoice-1042.txt",
+        content: new TextEncoder().encode("Total: 42.00"),
+        contentType: "text/plain",
+      },
+    ],
+  });
+});
+```
+
+| Field         | Rules                                                                |
+| ------------- | -------------------------------------------------------------------- |
+| `filename`    | Not blank, no control characters                                     |
+| `content`     | `Uint8Array`                                                         |
+| `contentType` | Must look like `type/subtype`                                        |
+| `contentId`   | Optional. No whitespace or angle brackets. Unique within the message |
+
+## Inline images
+
+An attachment with a `contentId` is inline. Reference it from the HTML with a `cid:` URL.
+
+**Example** (Embedding a Logo in the HTML Body)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+
+declare const logoPng: Uint8Array;
+
+const program = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    html: '<img src="cid:logo@example.com" alt="Example" />',
+    attachments: [
+      {
+        filename: "logo.png",
+        content: logoPng,
+        contentType: "image/png",
+        contentId: "logo@example.com",
+      },
+    ],
+  });
+});
+```
+
+## Provider support
+
+Attachments and inline images are capabilities, and a message that needs one the provider lacks fails with `UnsupportedFeatureError` before any request.
+
+- No attachments: MailerSend, Brevo and Plunk.
+- No inline images: Mailgun, MailerSend, Brevo, Scaleway, Mailchimp Transactional and Plunk.
+
+<Callout type="warn" title="Lettermint content ids">
+  Lettermint rejects an inline `contentId` that does not contain `@`, with `InvalidMessageError`.
+  Use a qualified id such as `logo@example.com`.
+</Callout>

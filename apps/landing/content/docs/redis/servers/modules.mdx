@@ -1,0 +1,121 @@
+---
+title: Modules
+description: Use typed JSON, Search, TimeSeries, probabilistic and vector commands on servers that have the modules.
+keywords: [RedisJSON, RediSearch, TimeSeries, Bloom, vector sets, FT.SEARCH, encodeFloat32]
+---
+
+The `Redis` service has typed commands for the optional server modules: JSON, Search, TimeSeries, the probabilistic structures (Bloom, Cuckoo, Count-Min, Top-K, t-digest) and vector sets. They work only on a server that has the module loaded. The client does not check, so a missing module comes back as a `ServerError`.
+
+**Example** (Storing and Reading a JSON Document)
+
+```ts twoslash
+import { Effect } from "effect";
+import { PayloadCodec, Redis } from "@effect-kit/redis";
+
+export const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.jsonSet("user:42", "$", '{"name":"Ada","visits":1}');
+
+  return yield* redis.jsonGetWith("user:42", PayloadCodec.text);
+});
+```
+
+`jsonSet` takes the document as text and returns a `boolean`. `jsonGet` returns the bytes and `jsonGetWith` decodes them with a `PayloadCodec`. Nothing is converted to JSON for you.
+
+## Searching and vectors
+
+`ftCreate` defines an index and `ftSearch` queries it. `encodeFloat32` builds the binary blob a vector field expects.
+
+**Example** (Creating a Vector Index and Querying It)
+
+```ts twoslash
+import { Effect } from "effect";
+import { Redis, encodeFloat32 } from "@effect-kit/redis";
+
+export const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  yield* redis.ftCreate(
+    "idx:docs",
+    [
+      { field: "title", type: "TEXT" },
+      {
+        field: "embedding",
+        type: "VECTOR",
+        algorithm: "HNSW",
+        attributes: { dataType: "FLOAT32", dimensions: 2, distanceMetric: "COSINE" },
+      },
+    ],
+    { on: "HASH", prefixes: ["doc:"] },
+  );
+
+  yield* redis.hset("doc:one", [
+    ["title", "hello world"],
+    ["embedding", yield* encodeFloat32([1, 0])],
+  ]);
+
+  return yield* redis.ftSearch("idx:docs", "hello", { dialect: 2 });
+});
+```
+
+Indexing is asynchronous on the server. A document written a moment ago may not be searchable yet.
+
+`ftSearch` returns `total` and a list of `documents`. Each document has an `id` and optional `fields`.
+
+## Aggregating with a cursor
+
+`RedisSearch.aggregate` returns a `Stream` of rows and reads an aggregation through a server cursor. One leased session owns the cursor, reads the pages and deletes it, including when you stop reading early. `RedisSearch` is not in the runtime layer, so add it with `RedisSearch.layer`, which needs `RedisSessions`.
+
+**Example** (Providing RedisSearch)
+
+```ts twoslash
+import { Effect, Layer, Stream } from "effect";
+import { RedisSearch } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+const RedisLive = RedisNode.layer({ url: "redis://localhost:6379" });
+const SearchLive = RedisSearch.layer.pipe(Layer.provide(RedisLive));
+
+export const rows = Effect.gen(function* () {
+  const search = yield* RedisSearch;
+
+  return yield* search
+    .aggregate("idx:docs", "hello", { steps: [{ _tag: "Load", fields: [{ field: "@title" }] }] })
+    .pipe(Stream.take(10), Stream.runCollect);
+}).pipe(Effect.provide(SearchLive));
+```
+
+## Declaring modules in a profile
+
+A [profile](/docs/redis/servers/engines) with `modules` rejects commands from any module not in the list, before sending. Use it to catch a missing module in development.
+
+**Example** (Allowing Only JSON)
+
+```ts twoslash
+import { RedisProfiles } from "@effect-kit/redis";
+import { RedisNode } from "@effect-kit/redis/node";
+
+export const RedisLive = RedisNode.layer({
+  url: "redis://localhost:6379",
+  profile: RedisProfiles.redis({ modules: ["json"] }),
+});
+```
+
+A search command now fails with `ProfileError` and `reason: "module"`. The profile module names are `json`, `search`, `timeseries`, `probabilistic`, `vectors`, `upstash-search` and `upstash-vector`.
+
+## Cluster and modules
+
+In a cluster, keep the keys of one command in one slot with a hash tag, as in [Multi-key commands](/docs/redis/cluster/multi-key). Commands without a key, such as `ftList` and `tsMget`, fail with `ClusterError` and `reason: "explicit-target-required"`. Run them on a node with `cluster.node(id)`.
+
+## Tested module configurations
+
+| Fixture          | Server                              | Modules                                      |
+| ---------------- | ----------------------------------- | -------------------------------------------- |
+| `redis-modules`  | Redis `8.10.2`                      | JSON, Search, TimeSeries, Bloom, vector sets |
+| `redis-stack`    | Redis Stack server image `7.4.0-v8` | JSON, Search, TimeSeries, Bloom              |
+| `valkey-modules` | Valkey bundle image `9.1.3`         | JSON, Search, Bloom                          |
+
+Dragonfly, KeyDB, Redict, Garnet and Kvrocks are tested with no modules. On Upstash over HTTP, use `redis.upstash.searchQuery` and `redis.upstash.vectorQuery` instead; see [Upstash](/docs/redis/runtimes/upstash).
+
+Search behavior differs between products. For example, `withScores` is rejected by the Valkey bundle in the package tests.

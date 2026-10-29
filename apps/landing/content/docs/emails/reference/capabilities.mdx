@@ -1,0 +1,65 @@
+---
+title: Capabilities
+description: The EmailCapabilities schema, idempotency modes, and what each of the 16 providers supports.
+---
+
+`EmailCapabilities` describes what a provider layer can send. Read it from `email.capabilities`. How the checks run is described in [Capabilities](/docs/emails/capabilities).
+
+## `EmailCapabilities`
+
+| Field               | Type                               | Description                             |
+| ------------------- | ---------------------------------- | --------------------------------------- |
+| `text`              | `boolean`                          | Accepts a `text` body.                  |
+| `html`              | `boolean`                          | Accepts an `html` body.                 |
+| `htmlAndText`       | `boolean`                          | Accepts both bodies in one message.     |
+| `senderName`        | `boolean`                          | Accepts a display name on `from`.       |
+| `cc`                | `boolean`                          | Accepts `cc`.                           |
+| `bcc`               | `boolean`                          | Accepts `bcc`.                          |
+| `replyTo`           | `"none" \| "single" \| "multiple"` | Number of reply-to addresses allowed.   |
+| `headers`           | `boolean`                          | Accepts custom headers.                 |
+| `attachments`       | `boolean`                          | Accepts attachments.                    |
+| `inlineAttachments` | `boolean`                          | Accepts attachments with a `contentId`. |
+| `idempotency`       | `Idempotency`                      | Whether and how a key is honored.       |
+
+The schema requires `text` or `html` to be true, requires both when `htmlAndText` is true, and requires `attachments` when `inlineAttachments` is true. `Email.make` fails with a `TypeError` otherwise.
+
+## `Idempotency`
+
+| Shape                            | Meaning                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| `{ mode: "unsupported" }`        | A key fails with `UnsupportedFeatureError`.           |
+| `{ mode: "replay", retention? }` | A repeated key returns the earlier outcome.           |
+| `{ mode: "reject", retention? }` | A repeated key fails with `IdempotencyConflictError`. |
+
+`retention` is a `Duration`. It is declared, not enforced.
+
+## `RetryAfter`
+
+A schema for a finite, non-negative `Duration`. It is the type of `retryAfter` on `RateLimitedError`, `QuotaExceededError` and `ProviderUnavailableError`, and of `retention`.
+
+## Provider matrix
+
+A dash means the field is not supported. `replyTo` shows `none`, `single` (one address) or `multiple`.
+
+| Provider                  | `text` | `html` | `htmlAndText` | `senderName` | `cc` | `bcc` | `replyTo` | `headers` | `attachments` | `inlineAttachments` | `idempotency`      |
+| ------------------------- | ------ | ------ | ------------- | ------------ | ---- | ----- | --------- | --------- | ------------- | ------------------- | ------------------ |
+| `resend`                  | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | replay, 24 hours   |
+| `nodemailer`              | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | -                  |
+| `ses`                     | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | -                  |
+| `azure`                   | yes    | yes    | yes           | -            | yes  | yes   | multiple  | yes       | yes           | yes                 | -                  |
+| `postmark`                | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | -                  |
+| `sendgrid`                | yes    | yes    | yes           | yes          | yes  | yes   | single    | yes       | yes           | yes                 | -                  |
+| `mailgun`                 | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | -                   | -                  |
+| `mailersend`              | yes    | yes    | yes           | yes          | yes  | yes   | single    | yes       | -             | -                   | -                  |
+| `brevo`                   | yes    | yes    | yes           | yes          | yes  | yes   | single    | yes       | -             | -                   | reject, 30 minutes |
+| `mailtrap`                | yes    | yes    | yes           | yes          | yes  | yes   | single    | yes       | yes           | yes                 | -                  |
+| `scaleway`                | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | -                   | -                  |
+| `lettermint`              | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | replay, 24 hours   |
+| `eusend`                  | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | replay             |
+| `zeptomail`               | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | yes                 | -                  |
+| `mailchimp-transactional` | yes    | yes    | yes           | yes          | yes  | yes   | multiple  | yes       | yes           | -                   | -                  |
+| `plunk`                   | -      | yes    | -             | yes          | -    | -     | none      | -         | -             | -                   | -                  |
+
+`lettermint` also reports its provider name as `lettermint/sandbox` when `sandbox: true`. Some providers reject a field for reasons that are not capability flags, such as the `@` Lettermint needs in an inline `contentId`. Those fail with `InvalidMessageError`.
+
+The `plunk` row means a message with a `text` body fails the capability check, so Plunk takes `html` only, with no `cc`, `bcc`, reply-to, headers or attachments.
