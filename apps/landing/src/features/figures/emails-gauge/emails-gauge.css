@@ -1,0 +1,119 @@
+/* Emails capability gate. The letter is the figure's one accent part. */
+
+.eg .iso-plate-corner[data-corner="title"],
+.eg .iso-plate-corner[data-corner="hint"] {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.eg-stage {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Letter: paper tinted by the page accent, edges in the accent itself. */
+.eg-letter > .iso-fill {
+  fill: color-mix(in oklab, var(--anatomy-accent) 10%, var(--anatomy-paper));
+}
+.eg-letter > .iso-top {
+  fill: color-mix(in oklab, var(--anatomy-accent) 24%, var(--anatomy-paper));
+}
+.eg-letter > .iso-shade[data-shade="0"] {
+  fill: color-mix(in oklab, var(--anatomy-accent) 34%, var(--anatomy-shade-0));
+}
+.eg-letter > .iso-shade[data-shade="1"] {
+  fill: color-mix(in oklab, var(--anatomy-accent) 30%, var(--anatomy-shade-1));
+}
+.eg-letter > .iso-shade[data-shade="2"] {
+  fill: color-mix(in oklab, var(--anatomy-accent) 27%, var(--anatomy-shade-2));
+}
+.eg-letter > .iso-shade[data-shade="3"] {
+  fill: color-mix(in oklab, var(--anatomy-accent) 24%, var(--anatomy-shade-3));
+}
+.eg-letter > .iso-edge {
+  stroke: var(--anatomy-accent);
+}
+.eg-letter > .iso-crease,
+.eg-letter > .iso-bevel {
+  stroke: color-mix(in oklab, var(--anatomy-accent) 60%, var(--anatomy-paper));
+}
+.eg-letter > .eg-letter-ink {
+  stroke: color-mix(in oklab, var(--anatomy-accent) 72%, var(--anatomy-paper));
+}
+.eg-letter-halo {
+  filter: blur(4px);
+  opacity: calc(var(--anatomy-halo-opacity) * 0.7);
+}
+.eg-clip {
+  stroke-width: 0.9px;
+}
+
+/* Counter window: a recess with digit wheels behind it. */
+.eg-recess {
+  fill: var(--anatomy-shade-0);
+}
+.eg-digit {
+  font-size: 4.4px;
+  fill: var(--anatomy-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hit areas over the dial and the letter: native buttons, at least 44 px. */
+.eg-hit {
+  position: absolute;
+  translate: -50% -50%;
+  width: 9%;
+  min-width: 44px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+  transition: outline-color 0.2s var(--anatomy-ease);
+}
+.eg-hit-letter {
+  width: 17%;
+  aspect-ratio: 2 / 1;
+  min-height: 44px;
+  border-radius: 8px;
+}
+.eg-hit:hover {
+  outline-color: var(--anatomy-mid);
+}
+.eg-hit:active {
+  outline-style: solid;
+}
+.eg-hit:focus-visible {
+  outline: 1.5px solid var(--anatomy-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .eg .iso-plate {
+    overflow: hidden;
+  }
+  .eg-stage {
+    margin: 0 -9%;
+  }
+  .eg .iso-plate-corner[data-corner="readout"] {
+    left: 0;
+    white-space: normal;
+    text-align: right;
+    line-height: 1.35;
+  }
+  .eg .iso-plate-corner[data-corner="hint"] {
+    bottom: 34px;
+  }
+  .eg .iso-plate {
+    padding-bottom: 86px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eg-hit {
+    transition: none;
+  }
+}

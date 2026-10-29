@@ -1,0 +1,131 @@
+/* Bench figure for /redis. Tokens follow the site theme; the bead takes the page accent. */
+.rw {
+  --rw-screen: #0d0d10;
+  --rw-ink: #d9d9de;
+  --rw-ink-dim: #8c8c93;
+}
+
+html:not(.dark) .rw {
+  --rw-screen: #e4e4df;
+  --rw-ink: #232327;
+  --rw-ink-dim: #6c6c72;
+}
+
+.rw .iso-figure {
+  margin: 0;
+}
+
+.rw .iso-plate-corner[data-corner="title"],
+.rw .iso-plate-corner[data-corner="hint"] {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.rw-stage {
+  display: block;
+  cursor: pointer;
+  outline: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rw-stage:focus-visible {
+  outline: 1px solid var(--anatomy-muted);
+  outline-offset: 6px;
+}
+
+.rw-stage:hover .rw-grip > .iso-edge,
+.rw-stage:focus-visible .rw-grip > .iso-edge {
+  stroke: var(--anatomy-lit);
+}
+
+.rw-stage:active .rw-grip > .iso-top {
+  fill: var(--anatomy-shade-2);
+}
+
+.rw-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.rw-screen {
+  fill: var(--rw-screen);
+  stroke: none;
+}
+
+.rw-display {
+  fill: var(--rw-ink);
+  font-family: var(--anatomy-mono);
+  letter-spacing: 0;
+}
+
+.rw-display-small {
+  fill: var(--rw-ink-dim);
+}
+
+.rw-digit {
+  font-weight: 500;
+}
+
+.rw-led {
+  fill: var(--anatomy-faint);
+  stroke: none;
+  transition: fill 160ms linear;
+}
+
+.rw-led[data-on="true"] {
+  fill: var(--anatomy-hi);
+}
+
+.rw-bead,
+.rw-reply {
+  pointer-events: none;
+}
+
+.rw-bead-body {
+  fill: var(--anatomy-accent);
+}
+
+.rw-bead-shade {
+  fill: #000;
+  opacity: 0.2;
+}
+
+.rw-bead-shine {
+  fill: #fff;
+  opacity: 0.6;
+}
+
+.rw-bead-edge {
+  fill: none;
+  stroke: color-mix(in oklab, var(--anatomy-accent) 55%, #000);
+  stroke-width: 0.7;
+}
+
+.rw-reply-body {
+  fill: var(--anatomy-face);
+  stroke: var(--anatomy-lit);
+  stroke-width: 0.8;
+}
+
+.rw-reply-core {
+  fill: var(--anatomy-lit);
+}
+
+/* On phones the drawing uses the card's side padding too, so the small parts stay legible. */
+@media (max-width: 520px) {
+  .rw .iso-plate .iso-svg {
+    width: calc(100% + 20px);
+    margin-left: -10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rw-led {
+    transition: none;
+  }
+}
