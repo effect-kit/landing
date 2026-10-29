@@ -12,7 +12,9 @@
   Tailwind CSS 4, Fumadocs with Base UI, Effect 4, Nitro for the server build.
 - TypeScript is strict, including `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`.
   Lint with oxlint (`--deny-warnings`) and format with oxfmt.
-- Add dependencies through the pnpm catalog in `pnpm-workspace.yaml` and commit the lockfile.
+- The pnpm catalog in `pnpm-workspace.yaml` holds only workspace tooling and packages shared
+  across workspaces. Add app-only dependencies to the app's `package.json` with an exact
+  version. Commit the lockfile.
 
 ## Layout
 
