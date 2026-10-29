@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
 
-import { ImageResponse } from "takumi-js/response";
-
-import { getRenderer } from "./fonts";
 import { OG } from "./templates";
 
 /** Renders an OG image as PNG, cached hard: the URL changes whenever its input does. */
 export async function ogResponse(node: ReactNode) {
+  // Takumi loads a native binary, so it is imported on first render rather than with the
+  // route tree: if the binary fails to load, only the OG routes fail, not the whole server.
+  const [{ ImageResponse }, { getRenderer }] = await Promise.all([
+    import("takumi-js/response"),
+    import("./fonts"),
+  ]);
   const renderer = await getRenderer();
 
   return new ImageResponse(node, {

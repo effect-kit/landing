@@ -53,7 +53,15 @@ export default defineConfig({
       ],
     }),
     // Nitro builds the server for the host it detects (Vercel when deployed there).
-    nitro({ vercel: { config: { version: 3, routes: markdownRoutes } } }),
+    nitro({
+      vercel: { config: { version: 3, routes: markdownRoutes } },
+      // Takumi stays an external, fully traced package so it loads its native binary at
+      // runtime. Bundled, it pulls in the WASM build and the server fails to start.
+      wasm: false,
+      exportConditions: ["!unwasm"],
+      rolldownConfig: { external: ["takumi-js/response", "takumi-js/node"] },
+      traceDeps: ["takumi-js"],
+    }),
     react(),
   ],
   resolve: {
