@@ -11,6 +11,7 @@
 @import "./home.css";
 @import "./redis.css";
 @import "./emails.css";
+@import "./errors.css";
 
 /*
  * Effect Kit theme: zinc neutrals after effect.website, with one accent per page: blue for
