@@ -24,7 +24,7 @@ export default defineConfig({
         enabled: true,
         crawlLinks: true,
       },
-      pages: packageDocs,
+      pages: [...packageDocs, { path: "/sitemap.xml" }, { path: "/robots.txt" }],
     }),
     react(),
   ],

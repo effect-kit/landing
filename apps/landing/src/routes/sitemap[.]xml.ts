@@ -1,0 +1,80 @@
+import { createFileRoute } from "@tanstack/react-router";
+
+import { docsImageUrl, type SitePage, siteImageUrl } from "@/lib/og/urls";
+import { absolute } from "@/lib/site";
+import { source } from "@/lib/source";
+
+interface Entry {
+  readonly path: string;
+  readonly image: string;
+  readonly priority: string;
+  readonly changefreq: "weekly" | "monthly";
+  readonly lastmod?: string;
+}
+
+const landing: readonly { path: string; page: SitePage; priority: string }[] = [
+  { path: "/", page: "home", priority: "1.0" },
+  { path: "/redis", page: "redis", priority: "0.9" },
+  { path: "/emails", page: "emails", priority: "0.9" },
+];
+
+const escape = (value: string) =>
+  value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+async function entries(): Promise<Entry[]> {
+  const docs = await Promise.all(
+    source.getPages().map(async (page): Promise<Entry> => {
+      const { lastModified } = await page.data.load();
+      const entry: Entry = {
+        path: page.url,
+        image: docsImageUrl(page.slugs),
+        priority: page.slugs.length <= 1 ? "0.8" : "0.6",
+        changefreq: "weekly",
+      };
+
+      return lastModified ? Object.assign(entry, { lastmod: lastModified.toISOString() }) : entry;
+    }),
+  );
+
+  return [
+    ...landing.map((entry) => ({
+      path: entry.path,
+      image: siteImageUrl(entry.page),
+      priority: entry.priority,
+      changefreq: "monthly" as const,
+    })),
+    ...docs,
+  ];
+}
+
+export const Route = createFileRoute("/sitemap.xml")({
+  server: {
+    handlers: {
+      GET: async () => {
+        const urls = (await entries())
+          .map(
+            (entry) => `  <url>
+    <loc>${escape(absolute(entry.path))}</loc>${entry.lastmod ? `\n    <lastmod>${entry.lastmod}</lastmod>` : ""}
+    <changefreq>${entry.changefreq}</changefreq>
+    <priority>${entry.priority}</priority>
+    <image:image><image:loc>${escape(entry.image)}</image:loc></image:image>
+  </url>`,
+          )
+          .join("\n");
+
+        const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+${urls}
+</urlset>
+`;
+
+        return new Response(body, {
+          headers: {
+            "Content-Type": "application/xml; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      },
+    },
+  },
+});

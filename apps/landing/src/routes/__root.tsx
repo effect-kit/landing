@@ -5,6 +5,8 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { RootProvider } from "fumadocs-ui/provider/tanstack";
 
 import SearchDialog from "@/components/search";
+import { pageTitle } from "@/lib/seo";
+import { site } from "@/lib/site";
 
 import appCss from "@/styles/app.css?url";
 
@@ -12,17 +14,26 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "theme-color", content: "#09090b" },
-      { title: "Effect Kit" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "theme-color", media: "(prefers-color-scheme: dark)", content: site.themeColor.dark },
       {
-        name: "description",
-        content: "Composable, open-source tooling for Effect.",
+        name: "theme-color",
+        media: "(prefers-color-scheme: light)",
+        content: site.themeColor.light,
       },
+      { name: "color-scheme", content: "dark light" },
+      { name: "application-name", content: site.name },
+      { name: "apple-mobile-web-app-title", content: site.name },
+      { name: "format-detection", content: "telephone=no" },
+      { name: "generator", content: "TanStack Start" },
+      { title: pageTitle() },
+      { name: "description", content: site.description },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/svg+xml", href: "/logo.svg" },
+      { rel: "sitemap", type: "application/xml", href: "/sitemap.xml" },
+      { rel: "me", href: site.github },
     ],
   }),
   component: RootComponent,
