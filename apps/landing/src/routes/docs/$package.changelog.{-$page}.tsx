@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 
@@ -5,7 +7,9 @@ import { useFumadocsLoader } from "fumadocs-core/source/client";
 import { DocsLayout } from "fumadocs-ui/layouts/spacious";
 import { DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/spacious/page";
 
+import { DocsChromeAnalytics } from "@/components/docs/analytics";
 import { ChangelogPagination, ChangelogTimeline } from "@/components/docs/changelog";
+import { track } from "@/lib/analytics/client";
 import { baseOptions } from "@/lib/layout.shared";
 import { docsImageUrl } from "@/lib/og/urls";
 import { getChangelogPackage, getPackage } from "@/lib/packages";
@@ -77,10 +81,21 @@ function Page() {
   const { slug, page, pageTree, releases, nextPage, unavailable } = useFumadocsLoader(
     Route.useLoaderData(),
   );
+
+  useEffect(() => {
+    track("changelog_viewed", {
+      package: slug,
+      page,
+      release_count: releases.length,
+      unavailable,
+    });
+  }, [slug, page, releases.length, unavailable]);
+
   const releasesUrl = `https://github.com/${gitConfig.user}/${slug}/releases`;
 
   return (
     <DocsLayout {...baseOptions(getPackage(slug))} tree={pageTree} tabs={tabs}>
+      <DocsChromeAnalytics />
       <DocsPage toc={[]}>
         <DocsTitle>Changelog</DocsTitle>
         <DocsDescription className="mb-2">
@@ -108,7 +123,7 @@ function Page() {
               .
             </p>
           ) : (
-            <ChangelogTimeline releases={releases} />
+            <ChangelogTimeline releases={releases} slug={slug} />
           )}
           <ChangelogPagination
             slug={slug}

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
+import { track } from "@/lib/analytics/client";
 import { cn } from "@/lib/cn";
 
 // Adapted from the Fumadocs changelog timeline (MIT), with notes rendered to HTML on the server.
@@ -31,8 +32,10 @@ const dayFormat = new Intl.DateTimeFormat("en-US", {
 /** Releases grouped by month, newest first, on a vertical line. */
 export function ChangelogTimeline({
   releases,
+  slug,
 }: {
   readonly releases: readonly ChangelogRelease[];
+  readonly slug: string;
 }) {
   const months = new Map<string, ChangelogRelease[]>();
 
@@ -53,7 +56,7 @@ export function ChangelogTimeline({
           </h2>
           <ol className="ms-3 border-s ps-6">
             {items.map((release) => (
-              <ChangelogItem key={release.id} release={release} />
+              <ChangelogItem key={release.id} release={release} slug={slug} />
             ))}
           </ol>
         </section>
@@ -62,7 +65,13 @@ export function ChangelogTimeline({
   );
 }
 
-function ChangelogItem({ release }: { readonly release: ChangelogRelease }) {
+function ChangelogItem({
+  release,
+  slug,
+}: {
+  readonly release: ChangelogRelease;
+  readonly slug: string;
+}) {
   const date = new Date(release.date);
 
   return (
@@ -86,6 +95,9 @@ function ChangelogItem({ release }: { readonly release: ChangelogRelease }) {
           <a
             href={release.url}
             title={`${release.title} on GitHub`}
+            onClick={() =>
+              track("changelog_release_clicked", { package: slug, release: release.title })
+            }
             className="transition-colors hover:text-fd-primary"
           >
             {release.title}

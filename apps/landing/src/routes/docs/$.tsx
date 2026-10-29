@@ -10,10 +10,11 @@ import {
   DocsDescription,
   DocsPage,
   DocsTitle,
-  MarkdownCopyButton,
   ViewOptionsPopover,
 } from "fumadocs-ui/layouts/spacious/page";
 
+import { DocsChromeAnalytics, DocsPageAnalytics } from "@/components/docs/analytics";
+import { CopyMarkdownButton } from "@/components/docs/page-actions";
 import { useMDXComponents } from "@/components/mdx";
 import { baseOptions } from "@/lib/layout.shared";
 import { docsImageUrl } from "@/lib/og/urls";
@@ -132,10 +133,11 @@ function Content({ path, slugs }: { path: string; slugs: readonly string[] }) {
 
   return (
     <DocsPage toc={toc}>
+      <DocsPageAnalytics packageSlug={slugs[0] ?? ""} title={page.title} />
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription className="mb-2">{page.description}</DocsDescription>
       <div className="flex flex-row flex-wrap items-center gap-2 border-b pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        <CopyMarkdownButton markdownUrl={markdownUrl} slug={slugs.join("/")} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
           githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/landing/content/docs/${path}`}
@@ -155,6 +157,7 @@ function Page() {
 
   return (
     <DocsLayout {...baseOptions(getPackage(packageSlug))} tree={pageTree} tabs={tabs}>
+      <DocsChromeAnalytics />
       <Suspense>
         <Content path={path} slugs={slugs} />
       </Suspense>
