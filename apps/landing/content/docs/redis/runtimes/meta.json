@@ -1,6 +1,5 @@
 {
   "title": "Runtimes",
-  "icon": "runtime",
   "defaultOpen": false,
   "pages": ["index", "node", "bun", "upstash"]
 }

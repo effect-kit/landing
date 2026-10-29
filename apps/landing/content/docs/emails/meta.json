@@ -3,18 +3,19 @@
   "description": "Typed email delivery",
   "root": true,
   "pages": [
+    "installation",
     "index",
-    "---[rocket]Getting started---",
-    "...(start)",
-    "---[send]Sending---",
+    "configuration",
+    "choosing-a-provider",
+    "---Sending---",
     "...(sending)",
-    "---[shield]Reliability---",
+    "---Reliability---",
     "...(reliability)",
-    "---[ops]Testing and extending---",
+    "---Testing and extending---",
     "...(extending)",
-    "---[providers]Providers---",
+    "---Providers---",
     "providers",
-    "---[reference]Reference---",
+    "---Reference---",
     "...reference"
   ]
 }

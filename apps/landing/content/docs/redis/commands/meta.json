@@ -1,6 +1,5 @@
 {
   "title": "Commands",
-  "icon": "commands",
   "defaultOpen": false,
   "pages": [
     "index",

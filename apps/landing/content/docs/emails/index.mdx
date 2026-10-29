@@ -1,21 +1,36 @@
 ---
-title: Emails
-description: Send email from Effect through one typed service that works with 16 providers.
-icon: intro
+title: Quick start
+description: Send a first message with Resend and read the receipt.
+icon: rocket
 ---
 
 `@effect-kit/emails` gives Effect programs one `Email` service. You pick a provider by providing its Layer, and the same `email.send` call works with Resend, Amazon SES, Postmark, SendGrid and 12 others.
 
-The package checks a message against the provider's capabilities before any request is made, and you install only the SDK of the provider you use.
+This walkthrough sends one message through Resend. Any other provider works the same way once its Layer is provided.
 
-**Example** (Sending a Welcome Email With Resend)
+## Install the package and the Resend SDK
 
-```ts twoslash
-import { Config, ConfigProvider, Effect, Layer } from "effect";
+```package-install
+@effect-kit/emails effect resend@6.34.1
+```
+
+## Set the API key
+
+`Resend.layerConfig` reads `RESEND_API_KEY` by default.
+
+```sh
+export RESEND_API_KEY="your-resend-api-key"
+```
+
+## Write the program
+
+**Example** (Sending a Message and Reading the Receipt)
+
+```ts twoslash title="send.ts"
+import { ConfigProvider, Effect, Layer } from "effect";
 import { Email } from "@effect-kit/emails";
 import * as Resend from "@effect-kit/emails/resend";
 
-// Reads RESEND_API_KEY from the environment
 const EmailLive = Resend.layerConfig().pipe(
   Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv())),
 );
@@ -27,47 +42,31 @@ const program = Effect.gen(function* () {
     to: "ada@example.com",
     subject: "Welcome",
     text: "Your account is ready.",
-    html: "<p>Your account is ready.</p>",
   });
-  return receipt;
-  //     ^?
+  console.log(receipt);
+  //          ^?
 });
 
 Effect.runPromise(program.pipe(Effect.provide(EmailLive)));
 ```
 
-`email.send` succeeds with a `SendReceipt` when the provider accepts the message. It fails with an `EmailError` otherwise.
+Use a `from` address that is verified with the provider.
 
-## What it is not
+## Run it
 
-The message model is the whole feature set. The package has:
+```sh
+node send.ts
+```
 
-- No tags, metadata, scheduling or template ids on a message. Unknown keys are rejected.
-- No template store. [React templates](/docs/emails/react-templates) render to HTML and text before you send.
-- No automatic retries or failover. You decide when to send again.
-- No delivery tracking. A receipt means the provider accepted the message, not that it arrived.
+```text
+{
+  provider: 'resend',
+  status: 'accepted',
+  references: [ { kind: 'providerMessageId', value: '...' } ]
+}
+```
 
-<Cards>
-  <Card title="Quick start" href="/docs/emails/quick-start" icon={<Icon name="rocket" />}>
-    Send a first message with Resend.
-  </Card>
-  <Card
-    title="Choosing a provider"
-    href="/docs/emails/choosing-a-provider"
-    icon={<Icon name="providers" />}
-  >
-    Compare what each provider supports.
-  </Card>
-  <Card title="Errors and retries" href="/docs/emails/errors" icon={<Icon name="errors" />}>
-    Read `EmailError` and decide when to retry.
-  </Card>
-  <Card title="Sending many" href="/docs/emails/sending-many" icon={<Icon name="send" />}>
-    Send a batch and get one result per message.
-  </Card>
-  <Card title="Testing" href="/docs/emails/testing" icon={<Icon name="test" />}>
-    Record messages without a network.
-  </Card>
-  <Card title="Providers" href="/docs/emails/providers" icon={<Icon name="providers" />}>
-    The capability matrix and one page per provider.
-  </Card>
-</Cards>
+<Callout type="warn" title="Accepted is not delivered">
+  A receipt means the provider accepted the message. The package never sees delivery, bounces or
+  opens.
+</Callout>

@@ -1,6 +1,5 @@
 {
   "title": "Servers",
-  "icon": "server",
   "defaultOpen": false,
   "pages": ["index", "engines", "providers", "modules"]
 }

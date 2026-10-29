@@ -1,6 +1,5 @@
 {
   "title": "All providers",
-  "icon": "providers",
   "defaultOpen": false,
   "pages": [
     "index",

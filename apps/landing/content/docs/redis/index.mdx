@@ -1,14 +1,24 @@
 ---
-title: Redis
-description: Run typed Redis commands from Effect programs on Node.js, Bun and Upstash.
-icon: intro
+title: Quick start
+description: Connect to a local server, write a key, read it back and count with INCR.
+icon: rocket
 ---
 
 `@effect-kit/redis` is a Redis client for Effect 4. It speaks the Redis protocol itself over platform sockets or Effect HTTP, so Effect is its only runtime dependency. Commands are typed, connections belong to a scope, and every failure is a typed error.
 
-**Example** (Setting and Reading a Key)
+This page runs a first program against a Redis-compatible server on `localhost:6379`.
 
-```ts twoslash
+## Install the package
+
+```package-install
+@effect-kit/redis effect
+```
+
+## Write the program
+
+The `Redis` service is what you `yield*`. The layer from `RedisNode.layer` provides it.
+
+```ts twoslash title="main.ts"
 import { Effect, Option } from "effect";
 
 import { Redis } from "@effect-kit/redis";
@@ -25,39 +35,31 @@ const program = Effect.gen(function* () {
 
   const greeting = yield* redis.get("greeting");
   //    ^?
+  const visits = yield* redis.incr("visits");
+  //    ^?
 
-  return Option.getOrElse(greeting, () => "not found");
+  return { greeting: Option.getOrElse(greeting, () => "Not found"), visits };
 });
 
 Effect.runPromise(program.pipe(Effect.provide(RedisLive))).then(console.log);
-// Output: Hello from Effect
 ```
 
-`redis.get` returns `Option<string>`, so a missing key is `None` and not an error. The layer opens the connection when it is built and closes it with the scope.
+## Run it
 
-## What it is not
+```sh
+node main.ts
+```
 
-- Not an ORM. Keys and values are strings or bytes, and JSON is opt-in through [typed values](/docs/redis/typed-values).
-- Not an in-memory fake. There is no test layer, so tests run against a real server.
-- Not a retrying client. After a command may have reached the server, the client does not send it again. See [errors and retries](/docs/redis/errors).
+## Read the output
 
-<Cards>
-  <Card title="Quick start" href="/docs/redis/quick-start" icon={<Icon name="rocket" />}>
-    Install the package and run a first program.
-  </Card>
-  <Card title="Connecting" href="/docs/redis/connecting" icon={<Icon name="plug" />}>
-    Layers for Node.js, Bun and Upstash, with URLs, TLS and timeouts.
-  </Card>
-  <Card title="Errors and retries" href="/docs/redis/errors" icon={<Icon name="errors" />}>
-    Tagged errors and what `delivery` says about a failed command.
-  </Card>
-  <Card title="Runtimes" href="/docs/redis/runtimes" icon={<Icon name="runtime" />}>
-    What each runtime supports.
-  </Card>
-  <Card title="Cluster" href="/docs/redis/cluster" icon={<Icon name="cluster" />}>
-    Hash slots, redirects and multi-key commands.
-  </Card>
-  <Card title="Commands" href="/docs/redis/commands" icon={<Icon name="commands" />}>
-    Every command family with its reply types.
-  </Card>
-</Cards>
+`visits` is a `bigint`, so it prints with an `n` suffix. It grows by one on every run.
+
+```text
+{ greeting: 'Hello from Effect', visits: 1n }
+```
+
+<Callout type="info" title="Replies are Option and bigint">
+  `redis.get` returns `Option<string>`, and an empty string is a different value from a missing key. `redis.incr` and other counters return `bigint`, not `number`.
+</Callout>
+
+The layer connects when it is built. If the server is down or the URL is wrong, `Effect.provide(RedisLive)` fails at startup with a typed error, before the first command runs.

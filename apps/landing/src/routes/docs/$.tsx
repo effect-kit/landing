@@ -133,7 +133,7 @@ function Content({ path, slugs }: { path: string; slugs: readonly string[] }) {
   return (
     <DocsPage toc={toc}>
       <DocsTitle>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
+      <DocsDescription className="mb-2">{page.description}</DocsDescription>
       <div className="flex flex-row flex-wrap items-center gap-2 border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover

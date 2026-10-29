@@ -14,6 +14,7 @@ import {
   Layers01Icon,
   LibraryIcon,
   Mailbox01Icon,
+  PackageIcon,
   MailSend01Icon,
   Megaphone01Icon,
   PlugSocketIcon,
@@ -35,6 +36,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
  */
 const icons = {
   intro: BookOpen01Icon,
+  install: PackageIcon,
   rocket: Rocket01Icon,
   guide: Compass01Icon,
   data: Database01Icon,

@@ -1,6 +1,5 @@
 {
   "title": "Cluster",
-  "icon": "cluster",
   "defaultOpen": false,
   "pages": ["index", "multi-key", "scanning"]
 }
