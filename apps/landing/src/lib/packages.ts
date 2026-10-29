@@ -50,3 +50,12 @@ export function getPackageFromUrl(url: string): PackageInfo | undefined {
 
   return getPackage(url.slice(docsRoute.length + 1).split("/")[0]);
 }
+
+/** The package a docs path like `/docs/redis/changelog` (as slugs) is the changelog of. */
+export function getChangelogPackage(slugs: readonly string[]): PackageInfo | undefined {
+  if (slugs.length !== 2 || slugs[1] !== "changelog") return undefined;
+
+  const pkg = getPackage(slugs[0]);
+
+  return pkg?.hasDocs ? pkg : undefined;
+}

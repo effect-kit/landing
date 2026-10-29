@@ -40,6 +40,8 @@ In the Vercel project:
   - `ENABLE_EXPERIMENTAL_COREPACK=1`, so Vercel uses the pnpm version in `packageManager`.
   - `VERCEL_DEEP_CLONE=true`, so docs pages get their modified date from git history.
   - `VITE_SITE_URL` (optional), to override the `https://effectkit.dev` origin on previews.
+  - `GITHUB_TOKEN` (optional), a token with no scopes, so the docs changelogs (read from each
+    package's GitHub releases) are not held to the 60 requests an hour GitHub allows without one.
 
 ## License
 

@@ -24,6 +24,7 @@ import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as DocsChar123Char125DotmdRouteImport } from './routes/docs/{$}[.]md'
 import { Route as OgSplatRouteImport } from './routes/og/$'
 import { Route as OgDocsSplatRouteImport } from './routes/og/docs/$'
+import { Route as DocsPackageChangelogChar123PageChar125RouteImport } from './routes/docs/$package.changelog.{-$page}'
 
 const MarketingRoute = MarketingRouteImport.update({
   id: '/_marketing',
@@ -99,6 +100,12 @@ const OgDocsSplatRoute = OgDocsSplatRouteImport.update({
   path: '/og/docs/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsPackageChangelogChar123PageChar125Route =
+  DocsPackageChangelogChar123PageChar125RouteImport.update({
+    id: '/docs/$package/changelog/{-$page}',
+    path: '/docs/$package/changelog/{-$page}',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof MarketingIndexRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/og/$': typeof OgSplatRoute
   '/docs/': typeof DocsIndexRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRoutesByTo {
   '/llms-full.txt': typeof LlmsFullDottxtRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/': typeof MarketingIndexRoute
   '/docs': typeof DocsIndexRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/_marketing/': typeof MarketingIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/og/$'
     | '/docs/'
     | '/og/docs/$'
+    | '/docs/$package/changelog/{-$page}'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/llms-full.txt'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/'
     | '/docs'
     | '/og/docs/$'
+    | '/docs/$package/changelog/{-$page}'
   id:
     | '__root__'
     | '/_marketing'
@@ -200,6 +212,7 @@ export interface FileRouteTypes {
     | '/_marketing/'
     | '/docs/'
     | '/og/docs/$'
+    | '/docs/$package/changelog/{-$page}'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -215,6 +228,7 @@ export interface RootRouteChildren {
   OgSplatRoute: typeof OgSplatRoute
   DocsIndexRoute: typeof DocsIndexRoute
   OgDocsSplatRoute: typeof OgDocsSplatRoute
+  DocsPackageChangelogChar123PageChar125Route: typeof DocsPackageChangelogChar123PageChar125Route
 }
 
 declare module '@tanstack/react-router' {
@@ -324,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OgDocsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/$package/changelog/{-$page}': {
+      id: '/docs/$package/changelog/{-$page}'
+      path: '/docs/$package/changelog/{-$page}'
+      fullPath: '/docs/$package/changelog/{-$page}'
+      preLoaderRoute: typeof DocsPackageChangelogChar123PageChar125RouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -356,6 +377,8 @@ const rootRouteChildren: RootRouteChildren = {
   OgSplatRoute: OgSplatRoute,
   DocsIndexRoute: DocsIndexRoute,
   OgDocsSplatRoute: OgDocsSplatRoute,
+  DocsPackageChangelogChar123PageChar125Route:
+    DocsPackageChangelogChar123PageChar125Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

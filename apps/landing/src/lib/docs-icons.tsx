@@ -10,6 +10,7 @@ import {
   CpuIcon,
   Database01Icon,
   HierarchySquare01Icon,
+  HistoryIcon,
   Key01Icon,
   Layers01Icon,
   LibraryIcon,
@@ -60,6 +61,7 @@ const icons = {
   layers: Layers01Icon,
   stream: WaterfallDown01Icon,
   code: SourceCodeIcon,
+  history: HistoryIcon,
 } satisfies Record<string, IconSvgElement>;
 
 export type DocsIconName = keyof typeof icons;

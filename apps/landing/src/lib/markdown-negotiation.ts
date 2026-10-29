@@ -5,6 +5,7 @@ import { isMarkdownPreferred } from "fumadocs-core/negotiation";
 import { landingMarkdown, landingPaths } from "@/content/landing-markdown";
 
 import { markdownHeaders } from "./agent-headers";
+import { getChangelogPackage } from "./packages";
 import { docsLlms, source } from "./source";
 
 /**
@@ -26,6 +27,13 @@ export const markdownNegotiation = createMiddleware({ type: "request" }).server(
     if (!isDocs) return next();
 
     const slugs = pathname.slice("/docs".length).split("/").filter(Boolean);
+    const changelog = getChangelogPackage(slugs);
+
+    if (changelog) {
+      const { changelogMarkdown } = await import("./changelog.server");
+      return new Response(await changelogMarkdown(changelog), { headers: markdownHeaders });
+    }
+
     const page = source.getPage(slugs.length > 0 ? slugs : ["redis"]);
 
     if (!page) return next();

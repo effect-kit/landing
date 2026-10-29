@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fumadocs/changelog": "0.1.0",
     "@hugeicons/core-free-icons": "4.4.0",
     "@hugeicons/react": "1.1.10",
     "@shikijs/magic-move": "4.5.0",

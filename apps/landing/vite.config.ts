@@ -40,6 +40,8 @@ export default defineConfig({
       prerender: {
         enabled: true,
         crawlLinks: true,
+        // Changelogs read GitHub releases at request time so a release shows without a deploy.
+        filter: (page) => !page.path.includes("/changelog"),
       },
       pages: [
         ...packageDocs,
