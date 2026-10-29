@@ -16,14 +16,22 @@
   "dependencies": {
     "@fontsource-variable/inter": "catalog:",
     "@fontsource-variable/jetbrains-mono": "catalog:",
+    "@shikijs/magic-move": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "cn": "catalog:",
+    "effect": "catalog:",
     "fumadocs-core": "catalog:",
     "fumadocs-mdx": "catalog:",
     "fumadocs-ui": "catalog:",
     "lucide-react": "catalog:",
+    "motion": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "shiki": "catalog:",
+    "takumi-js": "catalog:",
+    "tone": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@shikijs/themes": "catalog:",
@@ -35,7 +43,6 @@
     "@vitejs/plugin-react": "catalog:",
     "klarity": "catalog:",
     "oxlint": "catalog:",
-    "shiki": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
