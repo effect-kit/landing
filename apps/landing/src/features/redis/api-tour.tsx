@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { CodeWindow } from "@/components/marketing/code";
 import { useInView, useReducedMotion } from "@/components/marketing/hooks";
 import { MagicCode } from "@/components/marketing/magic-code";
-import type { SnippetId } from "@/content/snippets";
+import { type SnippetId, snippets } from "@/content/snippets";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -12,42 +12,36 @@ const tour = [
     id: "redis.keys",
     label: "Typed keys",
     line: "Decode on read, encode on write.",
-    file: "user.ts",
     result: "Option<{ name: string; active: boolean }>",
   },
   {
     id: "redis.pipeline",
     label: "Pipelines",
     line: "One round trip, one result per command.",
-    file: "pipeline.ts",
     result: "[Result<void>, Result<bigint>]",
   },
   {
     id: "redis.transaction",
     label: "Transactions",
     line: "A WATCH conflict comes back as a value.",
-    file: "balance.ts",
     result: "Committed | Conflict",
   },
   {
     id: "redis.pubsub",
     label: "Pub/Sub",
     line: "Messages arrive as an Effect Stream.",
-    file: "events.ts",
     result: "Stream<Message>",
   },
   {
     id: "redis.streams",
     label: "Streams",
     line: "Acknowledged only after your handler succeeds.",
-    file: "orders.ts",
     result: "acknowledged after success",
   },
 ] as const satisfies readonly {
   id: SnippetId;
   label: string;
   line: string;
-  file: string;
   result: string;
 }[];
 
@@ -141,7 +135,7 @@ export function ApiTour({ tokens }: { readonly tokens: KeyedSnippets }) {
           );
         })}
       </div>
-      <CodeWindow title={current.file} className="min-w-0 self-start">
+      <CodeWindow code={snippets[current.id].code} className="min-w-0 self-start">
         <MagicCode tokens={tokens} ids={apiTourSnippetIds} current={current.id} />
         <p className="border-t border-(--ek-line) px-5 py-3 font-mono text-xs text-fd-muted-foreground">
           <span className="text-ek-accent">{"// "}</span>

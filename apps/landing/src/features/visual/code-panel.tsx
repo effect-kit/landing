@@ -14,6 +14,8 @@ import { animate, motion, useMotionValue, useSpring, useTransform } from "motion
 
 import "@shikijs/magic-move/style.css";
 
+import { CopyButton } from "@/components/marketing/copy-button";
+
 const MAGIC_OPTIONS = { duration: 650, stagger: 0.3, lineNumbers: false } as const;
 const highlightSpring = { bounce: 0, visualDuration: 0.2 };
 const PAD_X = 6;
@@ -87,7 +89,7 @@ export function CodePanel({
   /** Every variant, tokenized by `visualCode`. Empty when the loader didn't provide them. */
   readonly steps: readonly KeyedTokensInfo[];
   readonly step: number;
-  /** Plain code shown when tokens are missing. */
+  /** The current variant as plain text: shown when tokens are missing, and what copy copies. */
   readonly fallback: string;
   readonly target: string | null;
   readonly reduced: boolean;
@@ -158,26 +160,32 @@ export function CodePanel({
   const animated = !reduced;
 
   return (
-    <div className="overflow-x-auto py-5">
-      <div ref={rootRef} className="relative inline-block min-w-full">
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 rounded-md border border-sky-500/60 bg-sky-400/15 shadow-[0_0_10px_rgb(56_189_248/0.25)] dark:border-sky-400/60"
-          style={{ x, y, width, height, opacity, filter }}
-        />
-        <div ref={codeRef} className="ek-code ek-magic relative text-[13px] leading-[1.7]">
-          {steps.length > 0 ? (
-            <ShikiMagicMovePrecompiled
-              steps={steps as KeyedTokensInfo[]}
-              step={step}
-              animate={animated}
-              options={MAGIC_OPTIONS}
-              onStart={() => setMoving(true)}
-              onEnd={() => setMoving(false)}
-            />
-          ) : (
-            <pre className="px-5 font-mono text-fd-muted-foreground">{fallback}</pre>
-          )}
+    <div className="relative">
+      <CopyButton
+        text={fallback}
+        className="absolute top-2 right-2 z-10 bg-fd-background/80 backdrop-blur-sm"
+      />
+      <div className="overflow-x-auto py-5">
+        <div ref={rootRef} className="relative inline-block min-w-full">
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 left-0 rounded-md border border-sky-500/60 bg-sky-400/15 shadow-[0_0_10px_rgb(56_189_248/0.25)] dark:border-sky-400/60"
+            style={{ x, y, width, height, opacity, filter }}
+          />
+          <div ref={codeRef} className="ek-code ek-magic relative text-[13px] leading-[1.7]">
+            {steps.length > 0 ? (
+              <ShikiMagicMovePrecompiled
+                steps={steps as KeyedTokensInfo[]}
+                step={step}
+                animate={animated}
+                options={MAGIC_OPTIONS}
+                onStart={() => setMoving(true)}
+                onEnd={() => setMoving(false)}
+              />
+            ) : (
+              <pre className="px-5 font-mono text-fd-muted-foreground">{fallback}</pre>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -12,7 +12,7 @@ import {
   emailProviders,
   getEmailProvider,
 } from "@/content/email-providers";
-import type { SnippetId } from "@/content/snippets";
+import { type SnippetId, snippets } from "@/content/snippets";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -86,14 +86,9 @@ export function ProviderSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
-      <div className="flex min-w-0 flex-col gap-4 self-start">
-        <CodeWindow title="send-welcome.ts">
-          <MagicCode tokens={tokens} ids={swapSnippetIds} current={`emails.swap.${provider.id}`} />
-        </CodeWindow>
-        <p className="font-mono text-xs text-fd-muted-foreground">
-          <span className="text-ek-accent">$</span> add @effect-kit/emails effect {provider.sdk}
-        </p>
-      </div>
+      <CodeWindow code={snippets[`emails.swap.${provider.id}`].code} className="min-w-0 self-start">
+        <MagicCode tokens={tokens} ids={swapSnippetIds} current={`emails.swap.${provider.id}`} />
+      </CodeWindow>
 
       <div className="relative min-w-0 overflow-x-auto rounded-xl border border-(--ek-line)">
         <table className="w-full min-w-[720px] border-collapse text-sm">

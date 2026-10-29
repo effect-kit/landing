@@ -1,8 +1,8 @@
 import { useState, useSyncExternalStore } from "react";
 
-import { CheckIcon, CopyIcon } from "lucide-react";
-
 import { cn } from "@/lib/cn";
+
+import { CopyButton } from "./copy-button";
 
 const managers = {
   pnpm: "pnpm add",
@@ -59,17 +59,9 @@ export function InstallCommand({
     () => "pnpm" as const,
   );
   const [optionId, setOptionId] = useState(options[0]?.id ?? "");
-  const [copied, setCopied] = useState(false);
 
   const option = options.find((entry) => entry.id === optionId) ?? options[0];
   const command = `${managers[manager]} ${option?.packages ?? ""}`;
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(command);
-
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
-  };
 
   return (
     <div
@@ -127,18 +119,7 @@ export function InstallCommand({
         <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-fd-foreground">
           {command}
         </code>
-        <button
-          type="button"
-          onClick={copy}
-          aria-label={copied ? "Copied" : "Copy install command"}
-          className="grid size-8 place-items-center rounded-md text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
-        >
-          {copied ? (
-            <CheckIcon className="size-4 animate-ek-pop text-ek-accent" />
-          ) : (
-            <CopyIcon className="size-4" />
-          )}
-        </button>
+        <CopyButton text={command} label="Copy install command" />
       </div>
     </div>
   );

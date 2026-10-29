@@ -4,6 +4,8 @@ import { snippets, type SnippetId } from "@/content/snippets";
 import { cn } from "@/lib/cn";
 import type { HighlightedSnippets } from "@/lib/highlight";
 
+import { CopyButton } from "./copy-button";
+
 const CodeContext = createContext<HighlightedSnippets>({});
 
 // Stable default so `active` doesn't change identity on every render.
@@ -83,36 +85,28 @@ export function Code({ id, active = NO_LINES, flashFrom, className }: CodeProps)
   );
 }
 
-/** Editor-style frame around code: title bar with file tabs. */
+/** Frame around code, with a copy button in the top-right corner. */
 export function CodeWindow({
-  title,
-  tabs,
+  code,
   children,
   className,
-  actions,
 }: {
-  readonly title?: string;
-  readonly tabs?: ReactNode;
-  readonly actions?: ReactNode;
+  /** The source the copy button copies. */
+  readonly code: string;
   readonly children: ReactNode;
   readonly className?: string;
 }) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-(--ek-line) bg-fd-card/60 shadow-[0_1px_0_0_var(--ek-line)_inset]",
+        "relative overflow-hidden rounded-lg border border-(--ek-line) bg-fd-card/60 shadow-[0_1px_0_0_var(--ek-line)_inset]",
         className,
       )}
     >
-      <div className="flex h-10 items-center gap-3 border-b border-(--ek-line) px-3">
-        <span aria-hidden="true" className="flex gap-1.5">
-          <span className="size-2.5 rounded-full bg-(--ek-line-strong)" />
-          <span className="size-2.5 rounded-full bg-(--ek-line-strong)" />
-          <span className="size-2.5 rounded-full bg-(--ek-line-strong)" />
-        </span>
-        {tabs ?? <span className="font-mono text-[11px] text-fd-muted-foreground">{title}</span>}
-        {actions ? <div className="ms-auto flex items-center gap-1">{actions}</div> : null}
-      </div>
+      <CopyButton
+        text={code}
+        className="absolute top-2 right-2 z-10 bg-fd-card/80 backdrop-blur-sm"
+      />
       {children}
     </div>
   );

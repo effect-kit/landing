@@ -5,6 +5,7 @@ import { EmailsLogo } from "@/components/logos";
 import { ButtonLink, ExternalButton } from "@/components/marketing/button";
 import { Code, CodeWindow } from "@/components/marketing/code";
 import { Container, Heading, Lede, Section, SectionHeader } from "@/components/marketing/section";
+import { snippets } from "@/content/snippets";
 import { EmailsGaugeFigure } from "@/features/figures/emails-gauge/figure";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -87,7 +88,7 @@ export function EmailsPage({
             wide
           />
           <div className="mt-12 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0" data-reveal>
-            <CodeWindow title="welcome.tsx">
+            <CodeWindow code={snippets["emails.react"].code}>
               <Code id="emails.react" />
             </CodeWindow>
             <TemplatePreview />

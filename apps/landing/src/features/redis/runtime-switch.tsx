@@ -5,7 +5,7 @@ import type { BrandKey } from "@/components/brands/data";
 import { CodeWindow } from "@/components/marketing/code";
 import { useReducedMotion } from "@/components/marketing/hooks";
 import { MagicCode } from "@/components/marketing/magic-code";
-import type { SnippetId } from "@/content/snippets";
+import { type SnippetId, snippets } from "@/content/snippets";
 import { cn } from "@/lib/cn";
 import type { KeyedSnippets } from "@/lib/magic";
 
@@ -279,7 +279,10 @@ export function RuntimeSwitch({ tokens }: { readonly tokens: KeyedSnippets }) {
             })}
           </ul>
         </div>
-        <CodeWindow title="program.ts" className="min-w-0 self-start">
+        <CodeWindow
+          code={snippets[`redis.runtime.${runtime.id}`].code}
+          className="min-w-0 self-start"
+        >
           <MagicCode
             tokens={tokens}
             ids={runtimeSnippetIds}
