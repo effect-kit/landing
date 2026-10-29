@@ -17,7 +17,9 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as Char123Char125DotmdRouteImport } from './routes/{$}[.]md'
 import { Route as MarketingIndexRouteImport } from './routes/_marketing/index'
 import { Route as MarketingEmailsRouteImport } from './routes/_marketing/emails'
+import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privacy'
 import { Route as MarketingRedisRouteImport } from './routes/_marketing/redis'
+import { Route as MarketingTermsRouteImport } from './routes/_marketing/terms'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
@@ -65,9 +67,19 @@ const MarketingEmailsRoute = MarketingEmailsRouteImport.update({
   path: '/emails',
   getParentRoute: () => MarketingRoute,
 } as any)
+const MarketingPrivacyRoute = MarketingPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => MarketingRoute,
+} as any)
 const MarketingRedisRoute = MarketingRedisRouteImport.update({
   id: '/redis',
   path: '/redis',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const MarketingTermsRoute = MarketingTermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => MarketingRoute,
 } as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
@@ -115,7 +127,9 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/{$}.md': typeof Char123Char125DotmdRoute
   '/emails': typeof MarketingEmailsRoute
+  '/privacy': typeof MarketingPrivacyRoute
   '/redis': typeof MarketingRedisRoute
+  '/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
@@ -131,7 +145,9 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/{$}.md': typeof Char123Char125DotmdRoute
   '/emails': typeof MarketingEmailsRoute
+  '/privacy': typeof MarketingPrivacyRoute
   '/redis': typeof MarketingRedisRoute
+  '/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
@@ -150,7 +166,9 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/{$}.md': typeof Char123Char125DotmdRoute
   '/_marketing/emails': typeof MarketingEmailsRoute
+  '/_marketing/privacy': typeof MarketingPrivacyRoute
   '/_marketing/redis': typeof MarketingRedisRoute
+  '/_marketing/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
@@ -170,7 +188,9 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/{$}.md'
     | '/emails'
+    | '/privacy'
     | '/redis'
+    | '/terms'
     | '/api/search'
     | '/docs/$'
     | '/docs/{$}.md'
@@ -186,7 +206,9 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/{$}.md'
     | '/emails'
+    | '/privacy'
     | '/redis'
+    | '/terms'
     | '/api/search'
     | '/docs/$'
     | '/docs/{$}.md'
@@ -204,7 +226,9 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/{$}.md'
     | '/_marketing/emails'
+    | '/_marketing/privacy'
     | '/_marketing/redis'
+    | '/_marketing/terms'
     | '/api/search'
     | '/docs/$'
     | '/docs/{$}.md'
@@ -289,11 +313,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketingEmailsRouteImport
       parentRoute: typeof MarketingRoute
     }
+    '/_marketing/privacy': {
+      id: '/_marketing/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof MarketingPrivacyRouteImport
+      parentRoute: typeof MarketingRoute
+    }
     '/_marketing/redis': {
       id: '/_marketing/redis'
       path: '/redis'
       fullPath: '/redis'
       preLoaderRoute: typeof MarketingRedisRouteImport
+      parentRoute: typeof MarketingRoute
+    }
+    '/_marketing/terms': {
+      id: '/_marketing/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof MarketingTermsRouteImport
       parentRoute: typeof MarketingRoute
     }
     '/api/search': {
@@ -350,13 +388,17 @@ declare module '@tanstack/react-router' {
 
 interface MarketingRouteChildren {
   MarketingEmailsRoute: typeof MarketingEmailsRoute
+  MarketingPrivacyRoute: typeof MarketingPrivacyRoute
   MarketingRedisRoute: typeof MarketingRedisRoute
+  MarketingTermsRoute: typeof MarketingTermsRoute
   MarketingIndexRoute: typeof MarketingIndexRoute
 }
 
 const MarketingRouteChildren: MarketingRouteChildren = {
   MarketingEmailsRoute: MarketingEmailsRoute,
+  MarketingPrivacyRoute: MarketingPrivacyRoute,
   MarketingRedisRoute: MarketingRedisRoute,
+  MarketingTermsRoute: MarketingTermsRoute,
   MarketingIndexRoute: MarketingIndexRoute,
 }
 

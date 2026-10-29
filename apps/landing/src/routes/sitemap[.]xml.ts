@@ -16,6 +16,8 @@ const landing: readonly { path: string; page: SitePage; priority: string }[] = [
   { path: "/", page: "home", priority: "1.0" },
   { path: "/redis", page: "redis", priority: "0.9" },
   { path: "/emails", page: "emails", priority: "0.9" },
+  { path: "/terms", page: "home", priority: "0.3" },
+  { path: "/privacy", page: "home", priority: "0.3" },
 ];
 
 const escape = (value: string) =>

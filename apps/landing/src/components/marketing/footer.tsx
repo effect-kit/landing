@@ -47,6 +47,7 @@ export function MarketingFooter() {
           <Link
             to="/"
             title="Effect Kit home"
+            data-ph-capture-attribute-location="footer"
             className="flex w-fit items-center gap-2.5"
             aria-label="Effect Kit home"
           >
@@ -87,6 +88,7 @@ export function MarketingFooter() {
                   to="/docs/$"
                   params={{ _splat: pkg.slug }}
                   title={`${pkg.name} documentation`}
+                  data-ph-capture-attribute-location="footer"
                   className={link}
                 >
                   {pkg.name}
@@ -117,9 +119,27 @@ export function MarketingFooter() {
       <div className="relative border-t border-(--ek-line) bg-fd-background">
         <Container className="flex max-w-[1400px] flex-col gap-2 py-5 font-mono text-xs text-fd-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>© 2026 Effect Kit Contributors · Apache-2.0</span>
-          <span className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-ek-accent" />
-            Built on Effect
+          <span className="flex items-center gap-4">
+            <Link
+              to="/terms"
+              title="Terms of use"
+              data-ph-capture-attribute-location="footer"
+              className={link}
+            >
+              Terms
+            </Link>
+            <Link
+              to="/privacy"
+              title="Privacy policy"
+              data-ph-capture-attribute-location="footer"
+              className={link}
+            >
+              Privacy
+            </Link>
+            <span className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-ek-accent" />
+              Built on Effect
+            </span>
           </span>
         </Container>
       </div>

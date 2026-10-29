@@ -48,3 +48,20 @@ export const docsLlms = llms(source, {
       .join("\n\n");
   },
 });
+
+/** Terms and privacy pages. A separate collection, so they stay out of the docs sidebar. */
+export const legal = defineDocs({
+  dir: "content/legal",
+  docs: {
+    async: true,
+    schema: pageSchema.extend({
+      /** Date of the last change, `YYYY-MM-DD`. */
+      updated: z.iso.date(),
+    }),
+  },
+});
+
+export const legalSource = loader({
+  source: legal.toFumadocsSource(),
+  baseUrl: "/legal",
+});
