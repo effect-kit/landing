@@ -63,6 +63,11 @@ export function startAnalytics() {
 
 /** Sends a product event from the catalogue in `events.ts`. A no-op where analytics is off. */
 export function track<E extends AnalyticsEvent>(event: E, properties: AnalyticsEvents[E]) {
+  // In development, events are announced on `window` so they can be checked in a browser.
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("ek:track", { detail: { event, properties } }));
+  }
+
   if (!isEnabled()) return;
 
   const send = () => posthog?.capture(event, properties);

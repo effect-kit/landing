@@ -91,6 +91,22 @@ export interface AnalyticsEvents {
   changelog_release_clicked: { package: string; release: string };
 
   // Blog
+  blog_post_viewed: {
+    slug: string;
+    category: string;
+    package: string;
+    tags: string;
+    reading_minutes: number;
+    featured: boolean;
+  };
+  blog_read_depth_reached: { percent: 25 | 50 | 75 | 100; slug: string };
+  /** Reached three quarters of the post after at least 30 seconds on it. */
+  blog_post_read: { slug: string; seconds: number };
+  blog_code_copied: { slug: string; language: string; lines: number; is_twoslash: boolean };
+  blog_type_hovered: { slug: string; identifier: string };
+  blog_outbound_clicked: { slug: string; host: string };
+  blog_tag_clicked: { slug: string; tag: string };
+  blog_rss_clicked: { location: Location };
   blog_post_clicked: {
     slug: string;
     surface: "featured" | "list" | "related" | "adjacent" | "series";

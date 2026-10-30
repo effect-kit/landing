@@ -16,6 +16,7 @@ import type { PostSummary } from "@/lib/blog/posts";
 import { getPackage } from "@/lib/packages";
 import { blog } from "@/lib/source";
 
+import { BlogPostAnalytics } from "./analytics";
 import { Byline } from "./authors";
 import { PostGrid } from "./blog-index";
 import { blogMdxComponents, PostEmbedsContext } from "./embeds";
@@ -63,6 +64,7 @@ function Tags({ post }: { readonly post: PostSummary }) {
             to="/blog/tags/$tag"
             params={{ tag }}
             title={`Posts tagged ${tagLabels[tag]}`}
+            onClick={() => track("blog_tag_clicked", { slug: post.slug, tag })}
             className="inline-flex h-7 items-center rounded-full border border-(--ek-line-strong) px-3 font-mono text-[11px] text-fd-muted-foreground transition-colors hover:border-fd-foreground/30 hover:text-fd-foreground"
           >
             #{tag}
@@ -192,11 +194,13 @@ export function PostPage({
 }) {
   const { post, path, newer, older, related, series, playground } = data;
   const article = useRef<HTMLElement>(null);
+  const body = useRef<HTMLDivElement>(null);
 
   return (
     <>
       <article ref={article} {...(post.package ? { "data-accent": post.package } : {})}>
         <ReadingProgress target={article} />
+        <BlogPostAnalytics post={post} article={body} />
 
         <header>
           <Container className="flex max-w-[1120px] flex-col gap-6 pt-12 pb-10 md:pt-20 md:pb-12">
@@ -266,7 +270,7 @@ export function PostPage({
         </header>
 
         <Container className="grid max-w-[1120px] gap-12 pt-12 pb-16 md:pt-16 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16">
-          <div className="min-w-0">
+          <div ref={body} className="min-w-0">
             {series ? <SeriesBox data={series} /> : null}
             <PostEmbedsContext value={{ slug: post.slug, playground, visual }}>
               <Suspense>

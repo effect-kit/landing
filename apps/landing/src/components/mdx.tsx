@@ -1,5 +1,7 @@
 import { type ComponentProps, useEffect, useRef } from "react";
 
+import { useLocation } from "@tanstack/react-router";
+
 import { Link } from "fumadocs-core/link";
 import * as Twoslash from "fumadocs-twoslash/ui";
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion";
@@ -15,9 +17,24 @@ import { Icon } from "@/lib/docs-icons";
 
 import { useDocsSlug } from "./docs/analytics";
 
+/**
+ * Docs pages and blog posts share these components; events go to the section they were read
+ * in, so a copy in a post is not counted as a docs copy.
+ */
+function useContentScope() {
+  const docsSlug = useDocsSlug();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const isBlog = pathname.startsWith("/blog/");
+
+  return {
+    isBlog,
+    slug: isBlog ? pathname.slice("/blog/".length).replace(/\/$/, "") : docsSlug,
+  };
+}
+
 /** Code block with Fumadocs' markup, reporting clicks on its copy button. */
 function TrackedPre(props: ComponentProps<typeof CodeBlock>) {
-  const slug = useDocsSlug();
+  const { isBlog, slug } = useContentScope();
 
   return (
     <CodeBlock
@@ -33,7 +50,7 @@ function TrackedPre(props: ComponentProps<typeof CodeBlock>) {
         const title = typeof props.title === "string" ? props.title : "";
         const language = title.includes(".") ? (title.split(".").pop() ?? "") : "";
 
-        track("docs_code_copied", {
+        track(isBlog ? "blog_code_copied" : "docs_code_copied", {
           slug,
           language: language || "unknown",
           lines: figure.querySelectorAll("pre .line").length,
@@ -48,7 +65,7 @@ function TrackedPre(props: ComponentProps<typeof CodeBlock>) {
 
 /** External links report a click; the rest behave as the stock link. */
 function TrackedLink(props: ComponentProps<typeof Link>) {
-  const slug = useDocsSlug();
+  const { isBlog, slug } = useContentScope();
 
   return (
     <Link
@@ -59,7 +76,10 @@ function TrackedLink(props: ComponentProps<typeof Link>) {
         try {
           const url = new URL(event.currentTarget.href, window.location.href);
           if (url.origin !== window.location.origin && url.protocol.startsWith("http")) {
-            track("docs_outbound_clicked", { slug, host: url.host });
+            track(isBlog ? "blog_outbound_clicked" : "docs_outbound_clicked", {
+              slug,
+              host: url.host,
+            });
           }
         } catch {
           // A malformed href has nothing to report.
@@ -74,7 +94,7 @@ const hovered = new Set<string>();
 
 /** Reports a type popup once per identifier per page view, after a short hover or a tap. */
 function TrackedPopupTrigger(props: ComponentProps<typeof Twoslash.PopupTrigger>) {
-  const slug = useDocsSlug();
+  const { isBlog, slug } = useContentScope();
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -93,7 +113,7 @@ function TrackedPopupTrigger(props: ComponentProps<typeof Twoslash.PopupTrigger>
       if (!identifier || hovered.has(identifier)) return;
 
       hovered.add(identifier);
-      track("docs_type_hovered", { slug, identifier });
+      track(isBlog ? "blog_type_hovered" : "docs_type_hovered", { slug, identifier });
     };
 
     const onEnter = (event: PointerEvent) => {
@@ -111,7 +131,7 @@ function TrackedPopupTrigger(props: ComponentProps<typeof Twoslash.PopupTrigger>
       element.removeEventListener("pointerleave", onLeave);
       element.removeEventListener("click", report);
     };
-  }, [slug]);
+  }, [isBlog, slug]);
 
   return <Twoslash.PopupTrigger {...props} ref={ref} />;
 }

@@ -39,6 +39,15 @@ const agents: readonly (readonly [RegExp, string])[] = [
   [/curl|wget|httpie|python-requests|node-fetch|undici|axios|go-http/i, "tool"],
 ];
 
+const sectionOf = (path: string) =>
+  path.startsWith("/blog")
+    ? "blog"
+    : path.startsWith("/docs")
+      ? "docs"
+      : path.startsWith("/llms")
+        ? "llms"
+        : "landing";
+
 const agentOf = (userAgent: string) =>
   agents.find(([pattern]) => pattern.test(userAgent))?.[1] ?? "other";
 
@@ -59,6 +68,7 @@ export async function trackAgentContent(request: Request, kind: AgentContentKind
     event: "agent_content_fetched",
     properties: {
       path: url.pathname,
+      site_section: sectionOf(url.pathname),
       kind,
       agent,
       user_agent: userAgent.slice(0, 200),

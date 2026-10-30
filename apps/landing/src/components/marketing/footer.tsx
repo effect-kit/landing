@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { BrandIcon } from "@/components/brands/brand-icon";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { EffectKitLogo } from "@/components/logos";
+import { track } from "@/lib/analytics/client";
 import { documentedPackages } from "@/lib/packages";
 
 import { ParticleWordmark } from "./particle-wordmark";
@@ -108,7 +109,12 @@ export function MarketingFooter() {
               </Link>
             </li>
             <li>
-              <a href="/blog/rss.xml" title="Effect Kit blog RSS feed" className={link}>
+              <a
+                href="/blog/rss.xml"
+                title="Effect Kit blog RSS feed"
+                onClick={() => track("blog_rss_clicked", { location: "footer" })}
+                className={link}
+              >
                 RSS feed
               </a>
             </li>

@@ -43,6 +43,7 @@ export function BlogHeader({
         <a
           href="/blog/rss.xml"
           title="Effect Kit blog RSS feed"
+          onClick={() => track("blog_rss_clicked", { location: "blog" })}
           className="inline-flex min-h-11 w-fit items-center gap-2 rounded-sm text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring"
         >
           <HugeiconsIcon icon={RssIcon} size={15} strokeWidth={1.8} aria-hidden="true" />
