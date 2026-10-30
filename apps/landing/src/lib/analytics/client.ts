@@ -105,7 +105,6 @@ function withPageContext(event: CaptureResult | null): CaptureResult | null {
           ? "blog"
           : "landing";
   properties["page_package"] = packageOf(path);
-  properties["theme"] = document.documentElement.classList.contains("dark") ? "dark" : "light";
   properties["viewport"] =
     window.innerWidth < 640 ? "phone" : window.innerWidth < 1024 ? "tablet" : "desktop";
   properties["reduced_motion"] = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

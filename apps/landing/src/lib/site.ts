@@ -13,7 +13,7 @@ export const site = {
   npm: "https://www.npmjs.com/org/effect-kit",
   locale: "en_US",
   license: "https://www.apache.org/licenses/LICENSE-2.0",
-  themeColor: { dark: "#09090b", light: "#ffffff" },
+  themeColor: "#09090b",
 } as const;
 
 /** Absolute URL for a path on this site. */

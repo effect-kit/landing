@@ -87,7 +87,6 @@ export interface AnalyticsEvents {
   docs_package_switched: { from: string; to: string };
   docs_toc_clicked: { slug: string; heading: string };
   docs_outbound_clicked: { slug: string; host: string };
-  theme_changed: { theme: string };
   changelog_viewed: { package: string; page: number; release_count: number; unavailable: boolean };
   changelog_release_clicked: { package: string; release: string };
 

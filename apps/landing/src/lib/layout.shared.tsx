@@ -27,5 +27,7 @@ export function baseOptions(pkg?: PackageInfo): BaseLayoutProps {
       ),
     },
     githubUrl: `https://github.com/${gitConfig.user}`,
+    // Dark only, so the docs chrome has no theme switch.
+    themeSwitch: { enabled: false },
   };
 }

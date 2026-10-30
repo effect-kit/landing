@@ -26,13 +26,8 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", media: "(prefers-color-scheme: dark)", content: site.themeColor.dark },
-      {
-        name: "theme-color",
-        media: "(prefers-color-scheme: light)",
-        content: site.themeColor.light,
-      },
-      { name: "color-scheme", content: "dark light" },
+      { name: "theme-color", content: site.themeColor },
+      { name: "color-scheme", content: "dark" },
       { name: "application-name", content: site.name },
       { name: "apple-mobile-web-app-title", content: site.name },
       { name: "format-detection", content: "telephone=no" },
@@ -56,7 +51,13 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
-const theme = { defaultTheme: "dark" } as const;
+// The site is dark only: no system preference, no switch and no `d` hotkey.
+const theme = {
+  forcedTheme: "dark",
+  defaultTheme: "dark",
+  enableSystem: false,
+  hotKey: false,
+} as const;
 const search = { SearchDialog } as const;
 
 function RootDocument({ children }: { children: ReactNode }) {
@@ -71,6 +72,8 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
+      className="dark"
+      style={{ colorScheme: "dark" }}
       data-docs={isDocs ? "" : undefined}
       data-accent={accent}
       suppressHydrationWarning

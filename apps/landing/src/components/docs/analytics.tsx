@@ -83,12 +83,10 @@ function viewOption(link: HTMLAnchorElement) {
   return VIEW_OPTION_HOSTS[url.host];
 }
 
-const THEMES = new Set(["light", "dark", "system"]);
-
 let lastPackage: string | undefined;
 
 /**
- * Clicks inside the Fumadocs chrome (contents list, "Open" menu, theme switch) and package
+ * Clicks inside the Fumadocs chrome (contents list, "Open" menu) and package
  * switches. The markup is not ours, so one delegated listener reads it instead of wrapping it.
  */
 export function DocsChromeAnalytics() {
@@ -114,15 +112,6 @@ export function DocsChromeAnalytics() {
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
-
-      const radio = event.target.closest<HTMLElement>(
-        '[role="menuitemradio"], [data-theme-toggle] button',
-      );
-      const theme = radio?.getAttribute("aria-label")?.toLowerCase();
-      if (radio && theme && THEMES.has(theme) && radio.getAttribute("aria-checked") !== "true") {
-        track("theme_changed", { theme });
-        return;
-      }
 
       const link = event.target.closest("a");
       if (!link || link.closest("article")) return;

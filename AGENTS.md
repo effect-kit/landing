@@ -40,7 +40,8 @@
   reformats code inside MDX, so re-check carets after formatting. The dev server can serve a stale
   page after a broken edit; trust `pnpm build`.
 - Each page has one accent (blue for the kit, red for Redis, amber for emails) set with
-  `data-accent`. Support dark and light themes, phone widths and reduced motion.
+  `data-accent`. The site is dark only (forced in `__root.tsx`, no theme switch); support phone
+  widths and reduced motion.
 
 ## Code conventions
 
@@ -53,6 +54,6 @@
 
 ## Verification
 
-- For visual changes, check the page in a browser in both themes and at 390px wide.
+- For visual changes, check the page in a browser at desktop width and at 390px wide.
 - The dev server can keep serving stale server code (the Shiki highlighter, OG routes) after
   edits; restart it before trusting what you see.
