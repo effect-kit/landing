@@ -36,7 +36,7 @@ The package does not export anything. Exporters for metrics and traces belong to
 
 ## Metrics
 
-Each operation is a `command`, a `pipeline` or a `transaction`. A pipeline or transaction counts once, not once per command inside it.
+Each operation is a `command`, a `pipeline`, a `transaction` or a `batch` (from `redis.batch` or a compiled plan's `execute`). A pipeline or transaction counts once, not once per command inside it.
 
 | Metric                               | Type                                    | Attributes             |
 | ------------------------------------ | --------------------------------------- | ---------------------- |
@@ -59,15 +59,15 @@ export const redisMetrics = Effect.gen(function* () {
 
 ## Spans
 
-With `tracing: true`, each operation runs in a span named `redis.command`, `redis.pipeline` or `redis.transaction`, with kind `client` and an `outcome` attribute. On failure the span ends with a fixed `RedisOperationFailure` value and the outcome, never your error.
+With `tracing: true`, each operation runs in a span named `redis.command`, `redis.pipeline`, `redis.transaction` or `redis.batch`, with kind `client` and an `outcome` attribute. On failure the span ends with a fixed `RedisOperationFailure` value and the outcome, never your error.
 
 ## What is never recorded
 
 Names and attributes never come from command arguments. The command name, keys and values are not recorded, so you cannot get per-command or per-key metrics from this layer.
 
 <Callout type="info" title="Only the Redis service is instrumented">
-  Calls on `Redis` are counted, including `execute`, `raw`, `redis.pipeline` and
-  `redis.transaction`. Sessions, Pub/Sub and Streams are not.
+  Calls on `Redis` are counted, including `execute`, `raw`, `redis.pipeline`, `redis.transaction`
+  and `redis.batch`. Sessions, Pub/Sub and Streams are not.
 </Callout>
 
 ## Inspecting pools and subscriptions

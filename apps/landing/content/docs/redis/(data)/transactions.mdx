@@ -45,6 +45,10 @@ const program = Effect.gen(function* () {
 | WATCH conflict                | Not applicable     | `Conflict`                   |
 | Run-time error in one command | Others still apply | Others still apply           |
 
+## Submission on standalone connections
+
+On a standalone native connection, a profile of `RedisProfiles.redis()` or `RedisProfiles.valkey()` lets the client send the queued commands and EXEC together once MULTI succeeds. Other profiles send them one step at a time. Results and errors are the same either way. See [Server engines](/docs/redis/servers/engines).
+
 ## Handling transaction errors
 
 A transaction that cannot run fails with a `TransactionError`. Its `reason` is `"queue-rejected"` or `"exec-rejected"`, and `execution` is `"not-executed"` or `"unknown"`. Failures of the batch itself, such as a lost connection, arrive as `BatchError` with per-command evidence.

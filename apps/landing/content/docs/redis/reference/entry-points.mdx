@@ -21,27 +21,27 @@ Pick one runtime entry point. See [Runtimes](/docs/redis/runtimes).
 
 Each service is a `Context.Service` class.
 
-| Export                     | Kind    | Purpose                                                                                      |
-| -------------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `Redis`                    | Service | Ordinary commands, `pipeline`, `transaction`, `execute`, `executePrepared`, `raw` and scans. |
-| `RedisSessions`            | Service | Leased sessions, `withSession`, `withBlockingSession`, `watch` and blocking commands.        |
-| `RedisStreams`             | Service | Continuous stream readers, group consumers and recovery.                                     |
-| `RedisScripts`             | Service | Runs a `RedisScript` by digest and loads it on demand.                                       |
-| `RedisAdmin`               | Service | Server, ACL, config, client and diagnostics commands.                                        |
-| `RedisPubSub`              | Service | `subscribe`, `psubscribe` and `ssubscribe`.                                                  |
-| `RedisTracking`            | Service | Client-side caching invalidation stream. Not in the default layer.                           |
-| `RedisCache`               | Service | Bounded `GET` cache over `RedisTracking`. Not in the default layer.                          |
-| `RedisSearch`              | Service | `aggregate` cursor stream with an owned lease. Needs `RedisSessions`.                        |
-| `RedisMonitor`             | Service | `MONITOR` event stream.                                                                      |
-| `RedisShutdown`            | Service | `SHUTDOWN`.                                                                                  |
-| `RedisCluster`             | Service | Cluster client. Provided by `layerCluster` on a runtime entry point.                         |
-| `RedisSentinel`            | Service | Sentinel client. Provided by `layerSentinel` on a runtime entry point.                       |
-| `RedisCredentials`         | Service | Credential refresh with `rotate`, `get`, `invalidate`, `revision` and `snapshot`.            |
-| `RedisSentinelCredentials` | Service | Credentials for the Sentinel plane.                                                          |
-| `CommandExecutor`          | Service | Runs a `Command`. The seam under `Redis`.                                                    |
-| `BatchExecutor`            | Service | Runs a batch of commands for pipelines and transactions.                                     |
-| `Connection`               | Service | The ordinary connection: `executeOrdinary`, `takePush`, `snapshot`, `close` and `abort`.     |
-| `Transport`                | Service | Opens a socket. The runtime entry points provide it.                                         |
+| Export                     | Kind    | Purpose                                                                                                          |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Redis`                    | Service | Ordinary commands, `pipeline`, `batch`, `compile`, `transaction`, `execute`, `executePrepared`, `raw` and scans. |
+| `RedisSessions`            | Service | Leased sessions, `withSession`, `withBlockingSession`, `watch` and blocking commands.                            |
+| `RedisStreams`             | Service | Continuous stream readers, group consumers and recovery.                                                         |
+| `RedisScripts`             | Service | Runs a `RedisScript` by digest and loads it on demand.                                                           |
+| `RedisAdmin`               | Service | Server, ACL, config, client and diagnostics commands.                                                            |
+| `RedisPubSub`              | Service | `subscribe`, `psubscribe` and `ssubscribe`.                                                                      |
+| `RedisTracking`            | Service | Client-side caching invalidation stream. Not in the default layer.                                               |
+| `RedisCache`               | Service | Bounded `GET` cache over `RedisTracking`. Not in the default layer.                                              |
+| `RedisSearch`              | Service | `aggregate` cursor stream with an owned lease. Needs `RedisSessions`.                                            |
+| `RedisMonitor`             | Service | `MONITOR` event stream.                                                                                          |
+| `RedisShutdown`            | Service | `SHUTDOWN`.                                                                                                      |
+| `RedisCluster`             | Service | Cluster client. Provided by `layerCluster` on a runtime entry point.                                             |
+| `RedisSentinel`            | Service | Sentinel client. Provided by `layerSentinel` on a runtime entry point.                                           |
+| `RedisCredentials`         | Service | Credential refresh with `rotate`, `get`, `invalidate`, `revision` and `snapshot`.                                |
+| `RedisSentinelCredentials` | Service | Credentials for the Sentinel plane.                                                                              |
+| `CommandExecutor`          | Service | Runs a `Command`. The seam under `Redis`.                                                                        |
+| `BatchExecutor`            | Service | Runs a batch of commands for pipelines and transactions.                                                         |
+| `Connection`               | Service | The ordinary connection: `executeOrdinary`, `takePush`, `snapshot`, `close` and `abort`.                         |
+| `Transport`                | Service | Opens a socket. The runtime entry points provide it.                                                             |
 
 ### Namespaces
 
@@ -117,7 +117,7 @@ Each error is a `Schema.TaggedErrorClass` with its own page section in [Errors](
 
 **Credentials.** `CredentialInput`, `CredentialLifetime`, `CredentialProvider`, `CredentialSnapshot`, `CredentialValues`, `RedisCredentialService`, `RefreshPolicy`.
 
-**Commands, protocol and connections.** `BatchOutcomes`, `BatchResults`, `BatchSlot`, `Command`, `CommandDefinition`, `CommandMetadata`, `ConnectionOptions`, `ConnectionSnapshot`, `PartialBatchError`, `PreparedCommand`, `PushReply`, `RawContract`, `RedisArgument`, `RedisCommand`, `RedisConnection`, `RedisError`, `RedisExecutor`, `ReplyDecoder`, `RespDecodeLimits`, `RespDecoder`, `RespEncodeLimits`, `RespPairs`, `RespValue`, `Routing`, `TransactionOutcome`, `TransportConnection`.
+**Commands, protocol and connections.** `BatchOutcomes`, `BatchResults`, `BatchSlot`, `BatchValues`, `Command`, `CommandDefinition`, `CommandMetadata`, `CompiledBatch`, `ConnectionOptions`, `ConnectionSnapshot`, `PartialBatchError`, `PreparedCommand`, `PushReply`, `RawContract`, `RedisArgument`, `RedisCommand`, `RedisConnection`, `RedisError`, `RedisExecutor`, `ReplyDecoder`, `RespDecodeLimits`, `RespDecoder`, `RespEncodeLimits`, `RespPairs`, `RespValue`, `Routing`, `TransactionOutcome`, `TransportConnection`.
 
 **Service clients.** `RedisAdminClient`, `RedisClient`, `RedisSearchClient`, `RedisSession`, `RedisSessionsClient`, `RedisStreamsClient`.
 

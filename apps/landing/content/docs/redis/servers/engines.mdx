@@ -39,6 +39,8 @@ An engine profile leaves TLS and authentication optional, allows any database, a
 
 All `ProfileError` failures have `delivery: "unsent"`.
 
+On a standalone native connection, `RedisProfiles.redis()` and `RedisProfiles.valkey()` also let a [transaction](/docs/redis/transactions) send its queued commands and EXEC together after MULTI succeeds. Other profiles submit them sequentially. Results are the same.
+
 ## Engine-specific rules
 
 The only command rule in an engine profile is for Garnet. The Garnet profile rejects `ZSCAN` with `NOSCORES`, because Garnet `v2.2.4` ignores the flag, and typed replies could then not tell scores from members. The command fails with `ProfileError` and `reason: "restricted-command"`.

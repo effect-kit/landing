@@ -1,7 +1,7 @@
 ---
 title: Pipelines
-description: Send several commands in one round trip and get one result per command.
-keywords: [pipeline, batch, BatchResults, BatchError]
+description: Send several commands in one round trip, as one Result per command or as plain values with batch and compile.
+keywords: [pipeline, batch, compile, CompiledBatch, BatchValues, BatchResults, BatchError]
 ---
 
 A **pipeline** writes several commands before it waits for any reply, then returns one `Result` per command in the same order. Each command keeps its own success type, and one failure does not hide the others.
@@ -37,6 +37,68 @@ const program = Effect.gen(function* () {
   succeed stay applied when a later one fails. Use a [transaction](/docs/redis/transactions) when
   the commands must run together.
 </Callout>
+
+## Getting plain values with batch
+
+`redis.batch` runs the same kind of command tuple in order, but succeeds with the plain values instead of `Result` wrappers. Use it when any failed command should fail the whole step. Use `pipeline` when you want to handle each failure yourself.
+
+**Example** (Reading Values From a Batch)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const values = yield* redis.batch([Commands.get("greeting"), Commands.incr("visits")]);
+  //    ^?
+
+  return values;
+});
+```
+
+`redis.batch([])` succeeds with `[]`, and a batch holds at most `256` commands. Like a pipeline, a batch is ordered and not atomic.
+
+If any command fails, the whole batch fails with a `BatchError` whose `phase` is `"pipeline"` and whose `execution` is `"replied"`. The batch reads every reply first, so the `outcomes` list, which is `Redacted`, covers every command by index.
+
+On Node and Bun, a batch shares the ordinary connection. Upstash HTTP, cluster and sentinel clients use their own batch paths and keep their routing rules, such as the [hash tag rule](/docs/redis/cluster/multi-key) on a cluster.
+
+## Reusing a compiled plan
+
+`redis.compile` takes commands whose arguments are fixed and returns a `CompiledBatch`. Calling `execute()` on it returns the same values tuple as `batch`. Compile once when you run the same commands many times.
+
+**Example** (Compiling and Executing a Plan)
+
+```ts twoslash
+import { Effect } from "effect";
+
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const plan = yield* redis.compile([Commands.get("greeting"), Commands.get("visits")]);
+
+  const first = yield* plan.execute();
+  //    ^?
+  const second = yield* plan.execute();
+
+  return [first, second];
+});
+```
+
+Compiling copies the arguments, including bytes, so changing a buffer afterwards does not change the plan. The native encoding is reused after the first run. Schema key encoders are required when you compile, and decoder services are required when you execute.
+
+A plan accepts up to `256` commands and `16 MiB` of encoded input. Provider and connection limits are checked again on every execution.
+
+<Callout type="warn" title="A plan belongs to its client">
+  Execute a plan only while the client that compiled it is open. After the client scope closes,
+  `execute()` fails with a `ConnectionError` whose `reason` is `"closed"`.
+</Callout>
+
+If a fiber is interrupted after a command may have been written, the shared Node or Bun connection is retired. Other requests waiting on that connection are affected too.
 
 ## Checking each result
 
