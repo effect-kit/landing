@@ -101,7 +101,9 @@ function withPageContext(event: CaptureResult | null): CaptureResult | null {
       ? "changelog"
       : path.startsWith("/docs")
         ? "docs"
-        : "landing";
+        : path === "/blog" || path.startsWith("/blog/")
+          ? "blog"
+          : "landing";
   properties["page_package"] = packageOf(path);
   properties["theme"] = document.documentElement.classList.contains("dark") ? "dark" : "light";
   properties["viewport"] =

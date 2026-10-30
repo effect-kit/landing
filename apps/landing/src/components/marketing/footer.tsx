@@ -96,6 +96,36 @@ export function MarketingFooter() {
               </li>
             ))}
           </Column>
+          <Column title="Updates">
+            <li>
+              <Link
+                to="/blog"
+                title="Effect Kit blog"
+                data-ph-capture-attribute-location="footer"
+                className={link}
+              >
+                Blog
+              </Link>
+            </li>
+            <li>
+              <a href="/blog/rss.xml" title="Effect Kit blog RSS feed" className={link}>
+                RSS feed
+              </a>
+            </li>
+            {documentedPackages.map((pkg) => (
+              <li key={pkg.slug}>
+                <Link
+                  to="/docs/$package/changelog/{-$page}"
+                  params={{ package: pkg.slug }}
+                  title={`${pkg.name} changelog`}
+                  data-ph-capture-attribute-location="footer"
+                  className={link}
+                >
+                  {pkg.name} changelog
+                </Link>
+              </li>
+            ))}
+          </Column>
           <Column title="Effect">
             {external.map((item) => (
               <li key={item.href}>

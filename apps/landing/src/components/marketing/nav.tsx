@@ -58,7 +58,10 @@ export function MarketingNav() {
               </Link>
             ) : null,
           )}
-          <span aria-hidden="true" className="mx-1 h-4 w-px bg-(--ek-line-strong) sm:mx-2" />
+          <span
+            aria-hidden="true"
+            className="mx-2 hidden h-4 w-px bg-(--ek-line-strong) sm:block"
+          />
           <Link
             to="/docs"
             title="Documentation"
@@ -66,6 +69,14 @@ export function MarketingNav() {
             onClick={() => track("nav_link_clicked", { location: "header", target: "docs" })}
           >
             Docs
+          </Link>
+          <Link
+            to="/blog"
+            title="Blog"
+            className={cn(link, "data-[status=active]:text-fd-foreground")}
+            onClick={() => track("nav_link_clicked", { location: "header", target: "blog" })}
+          >
+            Blog
           </Link>
           <a
             href="https://github.com/effect-kit"

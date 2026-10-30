@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { textHeaders } from "@/lib/agent-headers";
 import { countAgentRead } from "@/lib/analytics/agent";
+import { blogLlmsSection } from "@/lib/blog/markdown";
 import { getPageMarkdownUrl } from "@/lib/shared";
 import { absolute, site } from "@/lib/site";
 import { source } from "@/lib/source";
@@ -38,10 +39,14 @@ export const Route = createFileRoute("/llms.txt")({
             `- [Home](${absolute("/index.md")}): what Effect Kit is and how it fits an Effect app.`,
             `- [Redis for Effect](${absolute("/redis.md")}): a native Redis client for Effect.`,
             `- [Email for Effect](${absolute("/emails.md")}): one Email service for 16 providers.`,
+            `- [Blog](${absolute("/blog.md")}): releases, guides and notes.`,
             `- [Full docs as one file](${absolute("/llms-full.txt")})`,
           ].join("\n"),
           docsIndex(),
-        ].join("\n\n");
+          blogLlmsSection(),
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
         await countAgentRead(request, "llms");
 

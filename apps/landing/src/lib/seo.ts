@@ -23,9 +23,27 @@ export interface SeoInput {
   readonly section?: string;
   readonly jsonLd?: readonly Record<string, unknown>[];
   readonly noindex?: boolean;
+  /** Author profile URLs for `article:author`; defaults to the organisation. */
+  readonly authors?: readonly string[];
+  /** X handle with the `@` for `twitter:creator`; defaults to the site's. */
+  readonly twitterCreator?: string;
+  /** Absolute canonical URL, for pages first published elsewhere. */
+  readonly canonical?: string;
 }
 
 export const SEPARATOR = " | ";
+
+const imageTypes: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  avif: "image/avif",
+  gif: "image/gif",
+};
+
+/** Generated images are PNGs; CDN overrides can be any web format. */
+const imageType = (url: string) =>
+  imageTypes[url.split(".").pop()?.toLowerCase() ?? ""] ?? "image/png";
 
 export function pageTitle(title?: string) {
   return title ? `${title}${SEPARATOR}${site.name}` : `${site.name}${SEPARATOR}${site.tagline}`;
@@ -38,6 +56,7 @@ export function pageTitle(title?: string) {
 export function seo(input: SeoInput) {
   const title = pageTitle(input.title);
   const url = absolute(input.path);
+  const canonical = input.canonical ?? url;
   const type = input.type ?? "website";
   const width = String(input.image.width ?? 1200);
   const height = String(input.image.height ?? 630);
@@ -59,13 +78,13 @@ export function seo(input: SeoInput) {
     { property: "og:description", content: input.description },
     { property: "og:image", content: input.image.url },
     { property: "og:image:secure_url", content: input.image.url },
-    { property: "og:image:type", content: "image/png" },
+    { property: "og:image:type", content: imageType(input.image.url) },
     { property: "og:image:width", content: width },
     { property: "og:image:height", content: height },
     { property: "og:image:alt", content: input.image.alt },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:site", content: site.twitter },
-    { name: "twitter:creator", content: site.twitter },
+    { name: "twitter:creator", content: input.twitterCreator ?? site.twitter },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: input.description },
     { name: "twitter:image", content: input.image.url },
@@ -85,13 +104,14 @@ export function seo(input: SeoInput) {
 
     if (input.section) meta.push({ property: "article:section", content: input.section });
 
-    meta.push({ property: "article:author", content: site.github });
+    for (const author of input.authors ?? [site.github])
+      meta.push({ property: "article:author", content: author });
     for (const tag of input.keywords ?? []) meta.push({ property: "article:tag", content: tag });
   }
 
   return {
     meta,
-    links: [{ rel: "canonical", href: url }],
+    links: [{ rel: "canonical", href: canonical }],
     scripts: (input.jsonLd ?? []).map((data) => ({
       type: "application/ld+json",
       children: JSON.stringify(data),

@@ -1,0 +1,75 @@
+---
+title: "Redis 0.1.1: batches and compiled plans"
+description: Two new ways to run a fixed set of commands and get plain typed values back, plus faster pipelines and transactions under the hood.
+published: 2026-10-30
+authors: [vedant]
+category: release
+tags: [release, redis, performance]
+package: redis
+release:
+  version: 0.1.1
+  url: https://github.com/effect-kit/redis/releases/tag/%40effect-kit/redis%400.1.1
+cover:
+  src: blog/redis-0-1-1/cover.png
+  alt: An isometric Redis block with a batch of command tiles lined up beside it
+  width: 2400
+  height: 1260
+---
+
+`@effect-kit/redis` 0.1.1 is out. It adds two methods to the `Redis` client, `batch` and `compile`, and spends the rest of its changes on the native connection: fewer allocations, direct batch decoding and less work per reply. There are no breaking changes.
+
+```package-install
+@effect-kit/redis@0.1.1
+```
+
+## Plain values with batch
+
+A pipeline returns one `Result` per command, so one failure never hides the others. Often you don't want that: if any read fails, the whole step has failed. `redis.batch` runs the same kind of command tuple in order and succeeds with the plain values.
+
+```ts twoslash
+import { Effect } from "effect";
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const values = yield* redis.batch([Commands.get("greeting"), Commands.incr("visits")]);
+  //    ^?
+
+  return values;
+});
+```
+
+Each slot keeps its own type. If any command fails, the batch fails with a `BatchError` after every reply has been read, and its redacted `outcomes` cover each command by index. A batch holds up to 256 commands and, like a pipeline, is ordered but not atomic.
+
+## Compile once, run many times
+
+When the commands and their arguments are fixed, `redis.compile` turns them into a `CompiledBatch`. Calling `execute()` returns the same typed tuple as `batch`.
+
+```ts twoslash
+import { Effect } from "effect";
+import { Commands, Redis } from "@effect-kit/redis";
+
+const program = Effect.gen(function* () {
+  const redis = yield* Redis;
+
+  const plan = yield* redis.compile([Commands.get("greeting"), Commands.get("visits")]);
+
+  const first = yield* plan.execute();
+  const second = yield* plan.execute();
+
+  return [first, second];
+});
+```
+
+Compiling copies the arguments, including bytes, and reuses the native encoding after the first run. Limits are still checked on every execution. A plan belongs to the client that compiled it: after that client's scope closes, `execute()` fails with a `ConnectionError` whose reason is `"closed"`.
+
+## Faster transactions on Redis and Valkey
+
+On a standalone native connection with `RedisProfiles.redis()` or `RedisProfiles.valkey()`, a transaction now sends its queued commands and `EXEC` together once `MULTI` succeeds. Other profiles keep sending them one step at a time. Results and errors are the same either way.
+
+## Everything else
+
+The rest of the release is internal work on the native client: compact request bookkeeping, bounded reply draining, more efficient RESP buffering and direct decoding for batches. Session and blocking leases also got fairer: a lease released and taken again straight away no longer jumps ahead of callers already waiting.
+
+Read more in the docs on [pipelines, batches and compiled plans](/docs/redis/pipelines) and [transactions](/docs/redis/transactions), or see every change in the [changelog](/docs/redis/changelog).

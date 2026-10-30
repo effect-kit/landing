@@ -4,7 +4,7 @@ import { ogResponse } from "@/lib/og/render";
 import { SiteImage } from "@/lib/og/templates";
 import type { SitePage } from "@/lib/og/urls";
 
-const pages = new Set<SitePage>(["home", "redis", "emails"]);
+const pages = new Set<SitePage>(["home", "redis", "emails", "blog"]);
 
 export const Route = createFileRoute("/og/$")({
   server: {

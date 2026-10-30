@@ -14,7 +14,8 @@ export type Location =
   | "section"
   | "docs"
   | "not_found"
-  | "error";
+  | "error"
+  | "blog";
 
 export type PlaygroundOutcome = "succeeded" | "failed" | "interrupted" | "died";
 
@@ -89,6 +90,15 @@ export interface AnalyticsEvents {
   theme_changed: { theme: string };
   changelog_viewed: { package: string; page: number; release_count: number; unavailable: boolean };
   changelog_release_clicked: { package: string; release: string };
+
+  // Blog
+  blog_post_clicked: {
+    slug: string;
+    surface: "featured" | "list" | "related" | "adjacent" | "series";
+  };
+  blog_filter_changed: { category: string; previous: string };
+  blog_share_clicked: { slug: string; network: "x" | "linkedin" | "bluesky" | "copy" };
+  blog_toc_clicked: { slug: string; heading: string };
 
   // Site-wide
   page_not_found: { path: string; referrer_host: string };

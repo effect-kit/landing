@@ -3,6 +3,7 @@ import { pageSchema } from "fumadocs-core/source/schema";
 import { defineDocs } from "fumadocs-mdx/macro";
 import { z } from "zod";
 
+import { blogSchema } from "./blog/schema";
 import { docsIcon } from "./docs-icons";
 import { docsRoute } from "./shared";
 import { absolute } from "./site";
@@ -64,4 +65,20 @@ export const legal = defineDocs({
 export const legalSource = loader({
   source: legal.toFumadocsSource(),
   baseUrl: "/legal",
+});
+
+/** Blog posts, one MDX file per post in `content/blog`. The file name is the slug. */
+export const blog = defineDocs({
+  dir: "content/blog",
+  docs: {
+    async: true,
+    // Backs the `.md` routes, llms.txt, the feed and the reading time.
+    postprocess: { includeProcessedMarkdown: true },
+    schema: blogSchema,
+  },
+});
+
+export const blogSource = loader({
+  source: blog.toFumadocsSource(),
+  baseUrl: "/blog",
 });

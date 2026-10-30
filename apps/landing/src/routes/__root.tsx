@@ -15,7 +15,7 @@ import { startAnalytics } from "@/lib/analytics/client";
 import { getPackageFromUrl } from "@/lib/packages";
 import { pageTitle } from "@/lib/seo";
 import { docsRoute } from "@/lib/shared";
-import { site } from "@/lib/site";
+import { absolute, site } from "@/lib/site";
 
 import appCss from "@/styles/app.css?url";
 
@@ -44,6 +44,12 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/svg+xml", href: "/logo.svg" },
       { rel: "sitemap", type: "application/xml", href: "/sitemap.xml" },
+      {
+        rel: "alternate",
+        type: "application/rss+xml",
+        title: `${site.name} blog`,
+        href: absolute("/blog/rss.xml"),
+      },
       { rel: "me", href: site.github },
     ],
   }),

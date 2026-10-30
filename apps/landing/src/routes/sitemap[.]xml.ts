@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { docsImageUrl, type SitePage, siteImageUrl } from "@/lib/og/urls";
+import { listPosts } from "@/lib/blog/posts";
+import { blogImageUrl, docsImageUrl, type SitePage, siteImageUrl } from "@/lib/og/urls";
 import { absolute } from "@/lib/site";
 import { source } from "@/lib/source";
 
@@ -16,6 +17,7 @@ const landing: readonly { path: string; page: SitePage; priority: string }[] = [
   { path: "/", page: "home", priority: "1.0" },
   { path: "/redis", page: "redis", priority: "0.9" },
   { path: "/emails", page: "emails", priority: "0.9" },
+  { path: "/blog", page: "blog", priority: "0.7" },
   { path: "/terms", page: "home", priority: "0.3" },
   { path: "/privacy", page: "home", priority: "0.3" },
 ];
@@ -38,6 +40,21 @@ async function entries(): Promise<Entry[]> {
     }),
   );
 
+  const posts = await listPosts();
+  const blog: Entry[] = posts.map((post) => ({
+    path: post.url,
+    image: post.cover?.url ?? blogImageUrl(post.slug),
+    priority: "0.7",
+    changefreq: "monthly",
+    lastmod: new Date(`${post.updated ?? post.published}T00:00:00Z`).toISOString(),
+  }));
+  const tags = [...new Set(posts.flatMap((post) => post.tags))].map((tag): Entry => ({
+    path: `/blog/tags/${tag}`,
+    image: siteImageUrl("blog"),
+    priority: "0.4",
+    changefreq: "weekly",
+  }));
+
   return [
     ...landing.map((entry) => ({
       path: entry.path,
@@ -46,6 +63,8 @@ async function entries(): Promise<Entry[]> {
       changefreq: "monthly" as const,
     })),
     ...docs,
+    ...blog,
+    ...tags,
   ];
 }
 

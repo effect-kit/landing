@@ -27,6 +27,35 @@ pnpm check   # format, lint, typecheck, test and build
 
 Docs pages are MDX files in `apps/landing/content/docs/<package>/`.
 
+### Blog posts
+
+Each post is one MDX file in `apps/landing/content/blog/`; the file name is the slug
+(`redis-0-1-1.mdx` is `/blog/redis-0-1-1`). The frontmatter schema, with the allowed tags and
+categories, is in `apps/landing/src/lib/blog/schema.ts`, and authors are in
+`apps/landing/src/lib/blog/authors.ts`. A wrong tag, category or author fails the build.
+
+```yaml
+---
+title: "Redis 0.1.1: batches and compiled plans"
+description: One or two sentences, 50 to 160 characters, for cards and search results.
+published: 2026-10-30
+authors: [vedant]
+category: release # announcement | release | guide | engineering
+tags: [release, redis]
+package: redis # optional: the post's accent and docs link
+cover: # optional: without it the post gets a drawn cover
+  src: blog/redis-0-1-1/cover.png
+  alt: What the image shows
+  width: 2400
+  height: 1260
+---
+```
+
+Images are keys on `https://cdn.effectkit.dev` (an R2 bucket), never full URLs. Put a post's
+assets under `blog/<slug>/` and avatars under `authors/`. Covers are 1200 × 630 shown at 2×, so
+upload them at 2400 × 1260; `og` (same shape as `cover`) overrides the generated Open Graph
+image. `draft: true` shows a post in development only.
+
 ## Deployment
 
 The site deploys to Vercel. Nitro detects Vercel during the build and writes the Build Output

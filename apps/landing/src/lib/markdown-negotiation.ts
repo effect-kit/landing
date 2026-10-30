@@ -10,7 +10,7 @@ import { getChangelogPackage } from "./packages";
 import { docsLlms, source } from "./source";
 
 /**
- * Serves the Markdown version of a landing or docs page when the client asks for `text/markdown`, so agents
+ * Serves the Markdown version of a landing, docs or blog page when the client asks for `text/markdown`, so agents
  * get clean text from the same URL people read. Everything else passes through.
  */
 export const markdownNegotiation = createMiddleware({ type: "request" }).server(
@@ -24,6 +24,17 @@ export const markdownNegotiation = createMiddleware({ type: "request" }).server(
     if (landing) {
       await countAgentRead(request, "negotiated");
       return new Response(landingMarkdown(landing), { headers: markdownHeaders });
+    }
+
+    if (pathname === "/blog" || pathname.startsWith("/blog/")) {
+      const { blogIndexMarkdown, postMarkdown } = await import("./blog/markdown");
+      const slug = pathname.slice("/blog/".length).replace(/\/$/, "");
+      const body = slug ? await postMarkdown(slug) : await blogIndexMarkdown();
+
+      if (!body) return next();
+
+      await countAgentRead(request, "negotiated");
+      return new Response(body, { headers: markdownHeaders });
     }
 
     const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");

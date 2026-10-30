@@ -16,6 +16,13 @@ const acceptsMarkdown = [{ type: "header", key: "accept", value: "(?:.*[,\\s])?t
 const markdownRoutes = [
   { src: "^/$", has: acceptsMarkdown, dest: "/index.md", headers: { Vary: "Accept" } },
   { src: "^/(redis|emails)/?$", has: acceptsMarkdown, dest: "/$1.md", headers: { Vary: "Accept" } },
+  { src: "^/blog/?$", has: acceptsMarkdown, dest: "/blog.md", headers: { Vary: "Accept" } },
+  {
+    src: "^/blog/([a-z0-9-]+)/?$",
+    has: acceptsMarkdown,
+    dest: "/blog/$1.md",
+    headers: { Vary: "Accept" },
+  },
   {
     src: "^/docs/((?!.*\\.md$).+?)/?$",
     has: acceptsMarkdown,
@@ -77,6 +84,9 @@ export default defineConfig({
         { path: "/index.md" },
         { path: "/redis.md" },
         { path: "/emails.md" },
+        { path: "/blog" },
+        { path: "/blog.md" },
+        { path: "/blog/rss.xml" },
         { path: "/llms-full.txt" },
       ],
     }),

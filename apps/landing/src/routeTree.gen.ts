@@ -21,11 +21,17 @@ import { Route as MarketingPrivacyRouteImport } from './routes/_marketing/privac
 import { Route as MarketingRedisRouteImport } from './routes/_marketing/redis'
 import { Route as MarketingTermsRouteImport } from './routes/_marketing/terms'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as BlogRssDotxmlRouteImport } from './routes/blog/rss[.]xml'
+import { Route as BlogChar123slugChar125DotmdRouteImport } from './routes/blog/{$slug}[.]md'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as DocsChar123Char125DotmdRouteImport } from './routes/docs/{$}[.]md'
 import { Route as OgSplatRouteImport } from './routes/og/$'
+import { Route as MarketingBlogIndexRouteImport } from './routes/_marketing/blog/index'
+import { Route as MarketingBlogSlugRouteImport } from './routes/_marketing/blog/$slug'
+import { Route as OgBlogSplatRouteImport } from './routes/og/blog/$'
 import { Route as OgDocsSplatRouteImport } from './routes/og/docs/$'
+import { Route as MarketingBlogTagsTagRouteImport } from './routes/_marketing/blog/tags.$tag'
 import { Route as DocsPackageChangelogChar123PageChar125RouteImport } from './routes/docs/$package.changelog.{-$page}'
 
 const MarketingRoute = MarketingRouteImport.update({
@@ -87,6 +93,17 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
   path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
+  id: '/blog/rss.xml',
+  path: '/blog/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogChar123slugChar125DotmdRoute =
+  BlogChar123slugChar125DotmdRouteImport.update({
+    id: '/blog/{$slug}.md',
+    path: '/blog/{$slug}.md',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/docs/',
   path: '/docs/',
@@ -107,10 +124,30 @@ const OgSplatRoute = OgSplatRouteImport.update({
   path: '/og/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MarketingBlogIndexRoute = MarketingBlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const MarketingBlogSlugRoute = MarketingBlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => MarketingRoute,
+} as any)
+const OgBlogSplatRoute = OgBlogSplatRouteImport.update({
+  id: '/og/blog/$',
+  path: '/og/blog/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OgDocsSplatRoute = OgDocsSplatRouteImport.update({
   id: '/og/docs/$',
   path: '/og/docs/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MarketingBlogTagsTagRoute = MarketingBlogTagsTagRouteImport.update({
+  id: '/blog/tags/$tag',
+  path: '/blog/tags/$tag',
+  getParentRoute: () => MarketingRoute,
 } as any)
 const DocsPackageChangelogChar123PageChar125Route =
   DocsPackageChangelogChar123PageChar125RouteImport.update({
@@ -131,11 +168,17 @@ export interface FileRoutesByFullPath {
   '/redis': typeof MarketingRedisRoute
   '/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/blog/{$slug}.md': typeof BlogChar123slugChar125DotmdRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/og/$': typeof OgSplatRoute
   '/docs/': typeof DocsIndexRoute
+  '/blog/$slug': typeof MarketingBlogSlugRoute
+  '/og/blog/$': typeof OgBlogSplatRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/blog/': typeof MarketingBlogIndexRoute
+  '/blog/tags/$tag': typeof MarketingBlogTagsTagRoute
   '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRoutesByTo {
@@ -149,12 +192,18 @@ export interface FileRoutesByTo {
   '/redis': typeof MarketingRedisRoute
   '/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/blog/{$slug}.md': typeof BlogChar123slugChar125DotmdRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/og/$': typeof OgSplatRoute
   '/': typeof MarketingIndexRoute
   '/docs': typeof DocsIndexRoute
+  '/blog/$slug': typeof MarketingBlogSlugRoute
+  '/og/blog/$': typeof OgBlogSplatRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/blog': typeof MarketingBlogIndexRoute
+  '/blog/tags/$tag': typeof MarketingBlogTagsTagRoute
   '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRoutesById {
@@ -170,12 +219,18 @@ export interface FileRoutesById {
   '/_marketing/redis': typeof MarketingRedisRoute
   '/_marketing/terms': typeof MarketingTermsRoute
   '/api/search': typeof ApiSearchRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
+  '/blog/{$slug}.md': typeof BlogChar123slugChar125DotmdRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/og/$': typeof OgSplatRoute
   '/_marketing/': typeof MarketingIndexRoute
   '/docs/': typeof DocsIndexRoute
+  '/_marketing/blog/$slug': typeof MarketingBlogSlugRoute
+  '/og/blog/$': typeof OgBlogSplatRoute
   '/og/docs/$': typeof OgDocsSplatRoute
+  '/_marketing/blog/': typeof MarketingBlogIndexRoute
+  '/_marketing/blog/tags/$tag': typeof MarketingBlogTagsTagRoute
   '/docs/$package/changelog/{-$page}': typeof DocsPackageChangelogChar123PageChar125Route
 }
 export interface FileRouteTypes {
@@ -192,11 +247,17 @@ export interface FileRouteTypes {
     | '/redis'
     | '/terms'
     | '/api/search'
+    | '/blog/rss.xml'
+    | '/blog/{$slug}.md'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/og/$'
     | '/docs/'
+    | '/blog/$slug'
+    | '/og/blog/$'
     | '/og/docs/$'
+    | '/blog/'
+    | '/blog/tags/$tag'
     | '/docs/$package/changelog/{-$page}'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -210,12 +271,18 @@ export interface FileRouteTypes {
     | '/redis'
     | '/terms'
     | '/api/search'
+    | '/blog/rss.xml'
+    | '/blog/{$slug}.md'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/og/$'
     | '/'
     | '/docs'
+    | '/blog/$slug'
+    | '/og/blog/$'
     | '/og/docs/$'
+    | '/blog'
+    | '/blog/tags/$tag'
     | '/docs/$package/changelog/{-$page}'
   id:
     | '__root__'
@@ -230,12 +297,18 @@ export interface FileRouteTypes {
     | '/_marketing/redis'
     | '/_marketing/terms'
     | '/api/search'
+    | '/blog/rss.xml'
+    | '/blog/{$slug}.md'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/og/$'
     | '/_marketing/'
     | '/docs/'
+    | '/_marketing/blog/$slug'
+    | '/og/blog/$'
     | '/og/docs/$'
+    | '/_marketing/blog/'
+    | '/_marketing/blog/tags/$tag'
     | '/docs/$package/changelog/{-$page}'
   fileRoutesById: FileRoutesById
 }
@@ -247,10 +320,13 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   Char123Char125DotmdRoute: typeof Char123Char125DotmdRoute
   ApiSearchRoute: typeof ApiSearchRoute
+  BlogRssDotxmlRoute: typeof BlogRssDotxmlRoute
+  BlogChar123slugChar125DotmdRoute: typeof BlogChar123slugChar125DotmdRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsChar123Char125DotmdRoute: typeof DocsChar123Char125DotmdRoute
   OgSplatRoute: typeof OgSplatRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  OgBlogSplatRoute: typeof OgBlogSplatRoute
   OgDocsSplatRoute: typeof OgDocsSplatRoute
   DocsPackageChangelogChar123PageChar125Route: typeof DocsPackageChangelogChar123PageChar125Route
 }
@@ -341,6 +417,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/rss.xml': {
+      id: '/blog/rss.xml'
+      path: '/blog/rss.xml'
+      fullPath: '/blog/rss.xml'
+      preLoaderRoute: typeof BlogRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/{$slug}.md': {
+      id: '/blog/{$slug}.md'
+      path: '/blog/{$slug}.md'
+      fullPath: '/blog/{$slug}.md'
+      preLoaderRoute: typeof BlogChar123slugChar125DotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/': {
       id: '/docs/'
       path: '/docs'
@@ -369,12 +459,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OgSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_marketing/blog/': {
+      id: '/_marketing/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof MarketingBlogIndexRouteImport
+      parentRoute: typeof MarketingRoute
+    }
+    '/_marketing/blog/$slug': {
+      id: '/_marketing/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof MarketingBlogSlugRouteImport
+      parentRoute: typeof MarketingRoute
+    }
+    '/og/blog/$': {
+      id: '/og/blog/$'
+      path: '/og/blog/$'
+      fullPath: '/og/blog/$'
+      preLoaderRoute: typeof OgBlogSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/og/docs/$': {
       id: '/og/docs/$'
       path: '/og/docs/$'
       fullPath: '/og/docs/$'
       preLoaderRoute: typeof OgDocsSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_marketing/blog/tags/$tag': {
+      id: '/_marketing/blog/tags/$tag'
+      path: '/blog/tags/$tag'
+      fullPath: '/blog/tags/$tag'
+      preLoaderRoute: typeof MarketingBlogTagsTagRouteImport
+      parentRoute: typeof MarketingRoute
     }
     '/docs/$package/changelog/{-$page}': {
       id: '/docs/$package/changelog/{-$page}'
@@ -392,6 +510,9 @@ interface MarketingRouteChildren {
   MarketingRedisRoute: typeof MarketingRedisRoute
   MarketingTermsRoute: typeof MarketingTermsRoute
   MarketingIndexRoute: typeof MarketingIndexRoute
+  MarketingBlogSlugRoute: typeof MarketingBlogSlugRoute
+  MarketingBlogIndexRoute: typeof MarketingBlogIndexRoute
+  MarketingBlogTagsTagRoute: typeof MarketingBlogTagsTagRoute
 }
 
 const MarketingRouteChildren: MarketingRouteChildren = {
@@ -400,6 +521,9 @@ const MarketingRouteChildren: MarketingRouteChildren = {
   MarketingRedisRoute: MarketingRedisRoute,
   MarketingTermsRoute: MarketingTermsRoute,
   MarketingIndexRoute: MarketingIndexRoute,
+  MarketingBlogSlugRoute: MarketingBlogSlugRoute,
+  MarketingBlogIndexRoute: MarketingBlogIndexRoute,
+  MarketingBlogTagsTagRoute: MarketingBlogTagsTagRoute,
 }
 
 const MarketingRouteWithChildren = MarketingRoute._addFileChildren(
@@ -414,10 +538,13 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   Char123Char125DotmdRoute: Char123Char125DotmdRoute,
   ApiSearchRoute: ApiSearchRoute,
+  BlogRssDotxmlRoute: BlogRssDotxmlRoute,
+  BlogChar123slugChar125DotmdRoute: BlogChar123slugChar125DotmdRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsChar123Char125DotmdRoute: DocsChar123Char125DotmdRoute,
   OgSplatRoute: OgSplatRoute,
   DocsIndexRoute: DocsIndexRoute,
+  OgBlogSplatRoute: OgBlogSplatRoute,
   OgDocsSplatRoute: OgDocsSplatRoute,
   DocsPackageChangelogChar123PageChar125Route:
     DocsPackageChangelogChar123PageChar125Route,
