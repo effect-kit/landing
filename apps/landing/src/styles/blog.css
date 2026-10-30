@@ -37,14 +37,6 @@
   }
 }
 
-/* Cards: the cover lifts its art slightly on hover; the title takes the accent. */
-.ek-blog-card .ek-blog-cover > * {
-  transition: scale 0.6s var(--ease-out-expo);
-}
-.ek-blog-card:hover .ek-blog-cover > * {
-  scale: 1.025;
-}
-
 /* Reading progress under the sticky header. */
 .ek-blog-progress {
   transform-origin: 0 50%;
@@ -71,7 +63,9 @@
   color: var(--ek-accent);
 }
 .ek-blog-prose :where(h2) {
-  margin-top: 2.75em;
+  margin-top: 1.75em;
+  padding-top: 1.25em;
+  border-top: 1px solid var(--ek-line);
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -85,8 +79,5 @@
 @media (prefers-reduced-motion: reduce) {
   .ek-blog-float {
     animation: none;
-  }
-  .ek-blog-card .ek-blog-cover > * {
-    transition: none;
   }
 }

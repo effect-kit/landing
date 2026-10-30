@@ -15,8 +15,10 @@ export function SiteImage({ page }: { page: "home" | "redis" | "emails" | "blog"
   if (page === "blog") {
     return (
       <Frame accent="kit" crumb="Blog" art={<KitStack />} wide={false}>
-        <Title size={72}>Releases, guides and notes.</Title>
-        <Description>What changed in each Effect Kit package, and how to use it.</Description>
+        <Title size={80}>Effect Kit blog</Title>
+        <Description>
+          Release notes, guides and the reasons behind how Effect Kit works.
+        </Description>
       </Frame>
     );
   }

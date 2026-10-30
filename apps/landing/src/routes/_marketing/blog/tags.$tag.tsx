@@ -18,9 +18,9 @@ export const Route = createFileRoute("/_marketing/blog/tags/$tag")({
 
     return seo({
       title: `${label} posts`,
-      description: `Effect Kit blog posts tagged ${label}: releases, guides and notes.`,
+      description: `Effect Kit blog posts tagged ${label}.`,
       path,
-      image: { url: siteImageUrl("blog"), alt: "Effect Kit blog: releases, guides and notes" },
+      image: { url: siteImageUrl("blog"), alt: "Effect Kit blog" },
       jsonLd: [
         breadcrumbLd([
           { name: site.name, path: "/" },
@@ -40,19 +40,15 @@ function Page() {
   return (
     <>
       <BlogHeader
-        eyebrow={`Tag / #${tag}`}
-        title={tagLabels[tag]}
-        lede={`${count} tagged #${tag}.`}
-      >
-        <Link
-          to="/blog"
-          title="All posts"
-          className="inline-flex h-9 items-center rounded-md px-3 text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground"
-        >
-          All posts
-        </Link>
-      </BlogHeader>
-      <Container className="pb-24">
+        crumb={
+          <Link to="/blog" title="All posts" className="hover:text-fd-foreground">
+            Blog
+          </Link>
+        }
+        title={`#${tag}`}
+        lede={`${count} tagged ${tagLabels[tag]}.`}
+      />
+      <Container className="pt-10 pb-24 md:pt-12">
         <PostGrid posts={posts} />
       </Container>
     </>

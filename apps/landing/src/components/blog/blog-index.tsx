@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { RssIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import { Container, Eyebrow, Heading, Lede } from "@/components/marketing/section";
+import { Container } from "@/components/marketing/section";
 import { track } from "@/lib/analytics/client";
 import { categoryLabels } from "@/lib/blog/format";
 import type { PostSummary } from "@/lib/blog/posts";
@@ -14,47 +14,46 @@ import { cn } from "@/lib/cn";
 
 import { FeaturedPost, PostCard } from "./post-card";
 
-/** Page header shared by the blog index and tag pages: eyebrow, title, lede and the feed link. */
+/**
+ * Page header shared by the blog index and tag pages: a plain title and one line of context on
+ * the left, the feed link on the right, closed by the page's hairline.
+ */
 export function BlogHeader({
-  eyebrow,
+  crumb,
   title,
   lede,
-  children,
 }: {
-  readonly eyebrow: string;
+  /** Small trail above the title, for pages below the index. */
+  readonly crumb?: ReactNode;
   readonly title: ReactNode;
   readonly lede: ReactNode;
-  readonly children?: ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden">
-      <div
-        aria-hidden="true"
-        className="ek-err-backdrop pointer-events-none absolute inset-x-0 top-0 h-[420px]"
-      />
-      <Container className="relative flex flex-col gap-6 pt-16 pb-12 md:pt-24 md:pb-16">
-        <div className="flex animate-ek-rise flex-col gap-5">
-          <Eyebrow>{eyebrow}</Eyebrow>
-          <Heading as="h1" className="max-w-4xl">
+    <header className="border-b border-(--ek-line)">
+      <Container className="flex flex-col gap-6 pt-14 pb-10 md:flex-row md:items-end md:justify-between md:pt-20 md:pb-12">
+        <div className="flex max-w-2xl flex-col gap-3">
+          {crumb ? <div className="font-mono text-xs text-fd-muted-foreground">{crumb}</div> : null}
+          <h1 className="text-4xl leading-tight font-light tracking-[-0.03em] md:text-5xl">
             {title}
-          </Heading>
-          <Lede>{lede}</Lede>
+          </h1>
+          <p className="text-base leading-relaxed text-pretty text-fd-muted-foreground md:text-lg">
+            {lede}
+          </p>
         </div>
-        <div className="flex animate-ek-rise flex-wrap items-center gap-3 [animation-delay:80ms]">
-          <a
-            href="/blog/rss.xml"
-            title="Effect Kit blog RSS feed"
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-(--ek-line-strong) px-3 text-sm text-fd-foreground transition-colors hover:bg-fd-accent focus-visible:outline-2 focus-visible:outline-fd-ring"
-          >
-            <HugeiconsIcon icon={RssIcon} size={15} strokeWidth={1.8} className="text-ek-accent" />
-            RSS feed
-          </a>
-          {children}
-        </div>
+        <a
+          href="/blog/rss.xml"
+          title="Effect Kit blog RSS feed"
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-sm text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fd-ring"
+        >
+          <HugeiconsIcon icon={RssIcon} size={15} strokeWidth={1.8} aria-hidden="true" />
+          RSS feed
+        </a>
       </Container>
-    </section>
+    </header>
   );
 }
+
+export const blogLede = "Release notes, guides and the reasons behind how Effect Kit works.";
 
 const chip =
   "inline-flex h-8 items-center gap-2 rounded-full border px-3.5 font-mono text-xs transition-colors focus-visible:outline-2 focus-visible:outline-fd-ring";
@@ -160,33 +159,37 @@ export function BlogIndex({
 
   return (
     <>
-      <BlogHeader
-        eyebrow="Blog"
-        title="Releases, guides and notes."
-        lede="What changed in each Effect Kit package, how to use it, and why it works the way it does."
-      />
-      <Container className="flex flex-col gap-10 pb-24">
+      <BlogHeader title="Blog" lede={blogLede} />
+      <Container className="flex flex-col gap-10 pt-10 pb-24 md:pt-12">
         {featured ? <FeaturedPost post={featured} /> : null}
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 border-t border-(--ek-line) pt-8 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-mono text-xs text-fd-muted-foreground">
-              <span className="text-ek-accent">{"// "}</span>
-              {category ? categoryLabels[category].many : "All posts"}
-            </h2>
-            <Filters active={category} counts={counts} />
+        {/* With every post featured above, a list would only repeat it. */}
+        {listed.length > 0 || category || posts.length === 0 ? (
+          <div className="flex flex-col gap-6">
+            <div
+              className={cn(
+                "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+                featured && "border-t border-(--ek-line) pt-8",
+              )}
+            >
+              <h2 className="font-mono text-xs text-fd-muted-foreground">
+                <span className="text-ek-accent">{"// "}</span>
+                {category ? categoryLabels[category].many : "All posts"}
+              </h2>
+              <Filters active={category} counts={counts} />
+            </div>
+            {listed.length > 0 ? (
+              <PostGrid posts={listed} />
+            ) : (
+              <p className="rounded-xl border border-dashed border-(--ek-line-strong) px-6 py-12 text-center text-sm text-fd-muted-foreground">
+                {posts.length === 0
+                  ? "The first post is on its way."
+                  : category
+                    ? `No ${categoryLabels[category].many.toLowerCase()} yet.`
+                    : ""}
+              </p>
+            )}
           </div>
-          {listed.length > 0 ? (
-            <PostGrid posts={listed} />
-          ) : (
-            <p className="rounded-xl border border-dashed border-(--ek-line-strong) px-6 py-12 text-center text-sm text-fd-muted-foreground">
-              {posts.length === 0
-                ? "The first post is on its way."
-                : category
-                  ? `No ${categoryLabels[category].many.toLowerCase()} yet.`
-                  : "Every post is featured above."}
-            </p>
-          )}
-        </div>
+        ) : null}
       </Container>
     </>
   );

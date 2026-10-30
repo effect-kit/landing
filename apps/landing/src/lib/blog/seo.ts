@@ -53,7 +53,7 @@ export function blogLd(posts: readonly PostSummary[]) {
     "@id": ids.blog,
     name: `${site.name} blog`,
     url: absolute("/blog"),
-    description: "Releases, guides and notes from Effect Kit.",
+    description: "Release notes, guides and the reasons behind how Effect Kit works.",
     inLanguage: "en",
     publisher: { "@id": ids.organization },
     isPartOf: { "@id": ids.website },

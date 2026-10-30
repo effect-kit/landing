@@ -13,7 +13,7 @@ export async function blogIndexMarkdown() {
   return [
     "# Effect Kit blog",
     directive,
-    "Releases, guides and notes from Effect Kit, newest first.",
+    "Release notes, guides and the reasons behind how Effect Kit works, newest first.",
     posts
       .map(
         (post) =>

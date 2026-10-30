@@ -39,7 +39,7 @@ export const Route = createFileRoute("/llms.txt")({
             `- [Home](${absolute("/index.md")}): what Effect Kit is and how it fits an Effect app.`,
             `- [Redis for Effect](${absolute("/redis.md")}): a native Redis client for Effect.`,
             `- [Email for Effect](${absolute("/emails.md")}): one Email service for 16 providers.`,
-            `- [Blog](${absolute("/blog.md")}): releases, guides and notes.`,
+            `- [Blog](${absolute("/blog.md")}): release notes and guides.`,
             `- [Full docs as one file](${absolute("/llms-full.txt")})`,
           ].join("\n"),
           docsIndex(),

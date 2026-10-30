@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { z } from "zod";
 
-import { BlogIndex } from "@/components/blog/blog-index";
+import { BlogIndex, blogLede } from "@/components/blog/blog-index";
 import { loadBlogIndex } from "@/lib/blog/loaders";
 import { blogCategories } from "@/lib/blog/schema";
 import { blogLd } from "@/lib/blog/seo";
@@ -19,10 +19,9 @@ export const Route = createFileRoute("/_marketing/blog/")({
     const image = siteImageUrl("blog");
     const tags = seo({
       title: "Blog",
-      description:
-        "Releases, guides and notes from Effect Kit: what changed in each package and how to use it.",
+      description: blogLede,
       path: "/blog",
-      image: { url: image, alt: "Effect Kit blog: releases, guides and notes" },
+      image: { url: image, alt: "Effect Kit blog" },
       jsonLd: [
         blogLd(loaderData?.posts ?? []),
         breadcrumbLd([

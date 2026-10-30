@@ -76,7 +76,7 @@ ${post.tags.map((tag) => `      <category>${escape(tag)}</category>`).join("\n")
     <title>${escape(site.name)} blog</title>
     <link>${absolute("/blog")}</link>
     <atom:link href="${absolute("/blog/rss.xml")}" rel="self" type="application/rss+xml" />
-    <description>Releases, guides and notes from Effect Kit.</description>
+    <description>Release notes, guides and the reasons behind how Effect Kit works.</description>
     <language>en</language>
     <image>
       <url>${absolute("/logo.svg")}</url>

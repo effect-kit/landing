@@ -14,7 +14,6 @@ import { categoryLabels, formatDate, readingTime, tagLabels } from "@/lib/blog/f
 import type { BlogPostData } from "@/lib/blog/loaders";
 import type { PostSummary } from "@/lib/blog/posts";
 import { getPackage } from "@/lib/packages";
-import { gitConfig } from "@/lib/shared";
 import { blog } from "@/lib/source";
 
 import { Byline } from "./authors";
@@ -74,8 +73,8 @@ function Tags({ post }: { readonly post: PostSummary }) {
   );
 }
 
-/** Release, docs and source links in the side column. */
-function Resources({ post, path }: { readonly post: PostSummary; readonly path: string }) {
+/** Release, docs and Markdown links in the side column. */
+function Resources({ post }: { readonly post: PostSummary }) {
   const pkg = getPackage(post.package);
   const icon = <HugeiconsIcon icon={ArrowUpRight01Icon} size={13} strokeWidth={1.8} />;
 
@@ -106,16 +105,6 @@ function Resources({ post, path }: { readonly post: PostSummary; readonly path: 
       ) : null}
       <a href={`/blog/${post.slug}.md`} title="This post as Markdown" className={sideLink}>
         View as Markdown
-        {icon}
-      </a>
-      <a
-        href={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/landing/content/blog/${path}`}
-        title="Edit this post on GitHub"
-        target="_blank"
-        rel="noreferrer"
-        className={sideLink}
-      >
-        Edit on GitHub
         {icon}
       </a>
     </div>
@@ -302,7 +291,7 @@ export function PostPage({
                 <p className="font-mono text-xs text-fd-muted-foreground">Share</p>
                 <ShareLinks slug={post.slug} title={post.title} path={post.url} />
               </div>
-              <Resources post={post} path={path} />
+              <Resources post={post} />
             </div>
           </aside>
         </Container>
