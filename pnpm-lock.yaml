@@ -306,8 +306,8 @@ importers:
         specifier: 0.1.0
         version: 0.1.0(@types/react@19.3.0)(effect@4.0.7)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@effect-kit/redis':
-        specifier: 0.1.0
-        version: 0.1.0(effect@4.0.7)
+        specifier: 0.1.1
+        version: 0.1.1(effect@4.0.7)
       '@posthog/rollup-plugin':
         specifier: 1.6.2
         version: 1.6.2
@@ -609,8 +609,8 @@ packages:
       zeptomail:
         optional: true
 
-  '@effect-kit/redis@0.1.0':
-    resolution: {integrity: sha512-GclGe2oD3P7OPeVVWsv3tPucOQxwh/eku3R6FdPW04t6jhMvqM0ktMVWF8s4eq4DZfnY7+oJ1YZH8ej1+J7omg==}
+  '@effect-kit/redis@0.1.1':
+    resolution: {integrity: sha512-5IOTHG0j5b3u4cUBDEh+KoGfiUB5Q0ExRQS8+4k+GDOz8/At+H1xOmkdavTNj6kDoyvF40TwDwUPeqJzHktf2g==}
     engines: {node: '>=24.22.0'}
     peerDependencies:
       effect: ^4.0.6
@@ -3911,7 +3911,7 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  '@effect-kit/redis@0.1.0(effect@4.0.7)':
+  '@effect-kit/redis@0.1.1(effect@4.0.7)':
     dependencies:
       effect: 4.0.7
 
