@@ -29,14 +29,19 @@ export function packageReleases(slug: string, page: number): Promise<GitHubRelea
 
   if (hit && Date.now() - hit.at < TTL_MS) return hit.releases;
 
-  const token = process.env.GITHUB_TOKEN;
-  const releases = githubReleases({
-    owner: gitConfig.user,
-    repo: slug,
-    page,
-    perPage: RELEASES_PER_PAGE,
-    ...(token ? { token } : {}),
-  });
+  const request = { owner: gitConfig.user, repo: slug, page, perPage: RELEASES_PER_PAGE };
+  const token = process.env.GITHUB_TOKEN?.trim();
+
+  // A revoked or mistyped token makes GitHub reject even public reads, so fall back to an
+  // anonymous request rather than losing the page to a bad secret.
+  const releases = token
+    ? githubReleases({ ...request, token }).catch((error: unknown) => {
+        // The server log is the only place a rejected token shows up.
+        // oxlint-disable-next-line no-console
+        console.error("GitHub rejected GITHUB_TOKEN; retrying without it.", error);
+        return githubReleases(request);
+      })
+    : githubReleases(request);
 
   cache.set(key, { at: Date.now(), releases });
   // A failed request is retried on the next visit instead of being served for an hour.
