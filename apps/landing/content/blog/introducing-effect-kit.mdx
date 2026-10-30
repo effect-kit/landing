@@ -1,63 +1,148 @@
 ---
 title: Introducing Effect Kit
-description: Open-source packages that bring Redis and email into Effect as services you yield, Layers you swap and typed errors you can match on.
-published: 2026-10-27
+description: Redis and email for Effect, as services you yield and Layers you swap, with errors that tell you whether it is safe to try again.
+published: 2026-10-30
 authors: [vedant]
 category: announcement
 tags: [redis, emails, effect]
 featured: true
+playground: [redis, emails]
 cover:
-  src: blog/introducing-effect-kit/cover.png
-  alt: An isometric app plate with Redis, Emails and Storage blocks dropping into their slots
+  src: blog/introducing-effect-kit/cover.webp
+  alt: An isometric app plate with Redis and Emails blocks docked in their slots and an empty slot for Storage
   width: 2400
   height: 1260
 ---
 
-Effect Kit is a set of open-source packages for [Effect](https://effect.website). Each one brings a piece of infrastructure your app already depends on into Effect, in the shape Effect code expects: a service you `yield*`, a Layer you provide, and typed errors you can match on.
+Effect Kit is a set of open-source packages that bring the infrastructure your app depends on into [Effect](https://effect.website).
 
-The first two packages are out today: `@effect-kit/redis` and `@effect-kit/emails`, both at 0.1.0.
+This week we published the first two: `@effect-kit/redis` and `@effect-kit/emails`.
 
-## How a package fits your app
+## The question a Promise can't answer
 
-Every package follows the same four rules:
+If you talk to Redis or send email from Effect today, you probably wrap a Promise client in `Effect.tryPromise`. That works well, right up until a call fails halfway.
 
-1. Your program stays an ordinary Effect program.
-2. The package adds one service to context, with typed errors.
-3. You provide a Layer for it. The Layer owns clients and connections and closes them with the scope.
-4. You can swap the runtime, the provider or a test Layer without touching the program.
+The connection drops while you're writing. Did Redis apply the `INCR`? The email provider times out. Is the customer about to get two receipts?
 
-That last point is the reason the kit exists. Code that talks to Redis or sends email should not care whether it runs on Node.js or Bun, or whether the email goes through Resend or Amazon SES.
+The wrapped Promise can't tell you. It knows the request failed. It doesn't know how far it got, and that is the one thing you need to decide what to do next.
 
-## Redis
+We built Effect Kit around that question.
 
-`@effect-kit/redis` is a native Redis client. It speaks RESP itself, so Effect is its only dependency. Commands are typed, connections are scoped, and it covers pipelines, transactions, Pub/Sub, Streams, Cluster and Sentinel.
+## Every failure says how far it got
+
+In `@effect-kit/redis`, a dropped connection fails with a `ConnectionError`, and its `delivery` field says where the command was when it happened.
+
+`"unsent"` means nothing was written. The server never saw the command, so sending it again is safe.
+
+`"possibly-written"` means the bytes may have reached the server, but no reply came back. The command may have run once, or not at all.
+
+The client never sends a command twice on its own. Retrying is your call, and the error carries what you need to make it:
+
+```ts twoslash
+import { Effect, Schedule } from "effect";
+import { Redis } from "@effect-kit/redis";
+
+const markPaid = Effect.gen(function* () {
+  const redis = yield* Redis;
+  return yield* redis.set("order:42", "paid");
+}).pipe(
+  Effect.retry({
+    schedule: Schedule.exponential("200 millis"),
+    times: 5,
+    while: (error) => error._tag === "ConnectionError" && error.delivery === "unsent",
+  }),
+);
+```
+
+Here's that same situation as a machine you can break. Throw the switch before the write, then after it, and watch the error change.
+
+<RedisWrite
+  fig={1}
+  caption="Cut the connection before or after the write. Only one of them is safe to retry."
+/>
+
+The difference matters more for some commands than others. Setting `order:42` to `"paid"` twice is harmless. Incrementing a counter twice is a bug, and nothing in a plain error message will tell you which case you're in.
+
+Email has the same problem with a different name. Every `EmailError` from `@effect-kit/emails` carries an `acceptance` field:
+
+- `"notSubmitted"`: nothing reached the provider. Send it again.
+- `"rejected"`: the provider refused it. Sending the same message again won't help, so fix it first.
+- `"unknown"`: the provider may have accepted it. Retry only with an idempotency key on a provider that honors one.
+
+Some failures never need a request at all. Each provider declares what it can carry, and `email.send` checks the message against that before calling the provider. Send an attachment through MailerSend and you get an `UnsupportedFeatureError` with `acceptance: "notSubmitted"`, before anything leaves your process.
+
+## Swap the Layer, keep the program
+
+Each package gives you one service, `Redis` or `Email`, and a set of Layers that provide it. Your program only ever asks for the service:
 
 ```ts twoslash
 import { Effect } from "effect";
-import { Redis } from "@effect-kit/redis";
+import { Email } from "@effect-kit/emails";
 
-const program = Effect.gen(function* () {
-  const redis = yield* Redis;
-
-  yield* redis.set("greeting", "hello");
-  return yield* redis.get("greeting");
-});
+const welcome = (to: string) =>
+  Effect.gen(function* () {
+    const email = yield* Email;
+    return yield* email.send({
+      from: "hello@example.com",
+      to,
+      subject: "Welcome",
+      text: "Your account is ready.",
+    });
+  });
 ```
 
-It runs on Node.js and Bun over native sockets, and on Deno and Cloudflare Workers through Upstash HTTP. When a connection drops, the `ConnectionError` says how far the command got, so you know when a retry is safe.
+Where the email actually goes is decided once, at the edge of the app:
 
-Read the [Redis docs](/docs/redis) or see [Redis for Effect](/redis).
+```ts twoslash
+import { Effect } from "effect";
+import { Email } from "@effect-kit/emails";
+import * as Resend from "@effect-kit/emails/resend";
+import * as Postmark from "@effect-kit/emails/postmark";
+import { EmailTest } from "@effect-kit/emails/testing";
 
-## Emails
+const welcome = Effect.gen(function* () {
+  const email = yield* Email;
+  return yield* email.send({
+    from: "hello@example.com",
+    to: "ada@example.com",
+    subject: "Welcome",
+    text: "Your account is ready.",
+  });
+});
 
-`@effect-kit/emails` is one `Email` service across 16 providers, including Resend, Amazon SES, Postmark, SendGrid, Mailgun and SMTP. You install only the SDK you use.
+// ---cut---
+welcome.pipe(Effect.provide(Resend.layerConfig()));
+welcome.pipe(Effect.provide(Postmark.layerConfig()));
+welcome.pipe(Effect.provide(EmailTest.layer()));
+```
 
-Each provider declares what it can carry. A message that needs a feature the provider lacks fails before any request is made, instead of halfway through a send. Every `EmailError` also says whether the provider may have accepted the message, so retries stay safe.
+Moving from Resend to Postmark is a one-line change. So is a test: `EmailTest.layer()` runs the same validation and capability checks as a real provider, then records the message in an outbox you can assert on instead of sending it.
 
-Read the [Emails docs](/docs/emails) or see [Email for Effect](/emails).
+Redis works the same way across runtimes. `RedisNode.layer` and `RedisBun.layer` open native sockets, and `RedisUpstash.layerConfig` talks HTTP for places without them, like Deno and Cloudflare Workers.
 
-## What comes next
+<SwapLayer
+  fig={2}
+  caption="Turn a knob to swap a Layer. The program in the middle never changes."
+/>
 
-Storage is next: object storage with put, scoped get, head, delete and paginated listing, in the same shape as the others.
+## Try it
 
-The packages are Apache-2.0 and developed in the open on [GitHub](https://github.com/effect-kit). Issues and pull requests are welcome.
+Both retry examples are in the playground below, under the `Effect.retry` tab of each package, next to pipelines, scopes, batches and capability checks. They run against a simulated Redis and a simulated email provider, so you can pick where things fail.
+
+<Playground caption="Everything runs in your browser. Nothing here talks to a real server." />
+
+## What's in the first release
+
+**Redis.** A native client that speaks RESP itself, so Effect is its only dependency. Commands are typed, connections are scoped and close with your program, and it covers pipelines, transactions, Pub/Sub, Streams, Cluster and Sentinel. It runs against Redis, Valkey, Dragonfly, KeyDB, Redict, Garnet, Apache Kvrocks and Upstash. It's already on 0.1.1, which added typed `batch` and reusable `compile` plans. The [quick start](/docs/redis) takes a few minutes.
+
+**Emails.** One `Email` service across 16 providers, including Resend, Amazon SES, Postmark, SendGrid, Mailgun and SMTP. You install only the SDK for the provider you use. `EmailReact.render` turns a React Email component into HTML and plain-text bodies, and `email.sendMany` sends up to 1,000 messages with bounded concurrency, returning one result per message. Start with the [quick start](/docs/emails).
+
+Both packages are documented in full, and every docs page is also available as Markdown at the same URL with `.md` on the end, if you'd rather hand it to your agent.
+
+## What's next
+
+Storage is next: put, scoped get, head, delete and paginated listing, in the same shape as the other two. One service, a Layer per backend, and errors you can act on.
+
+Effect Kit is Apache-2.0 and developed in the open on [GitHub](https://github.com/effect-kit). If something is missing or broken, open an issue. Updates go out on X at [@effectkit](https://x.com/effectkit) and here on the blog.
+
+Thanks for reading. Now go break a connection on purpose.

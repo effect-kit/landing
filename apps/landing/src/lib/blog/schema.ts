@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { type AuthorId, authors } from "./authors";
 
-/** A key on the CDN, e.g. `blog/redis-0-1-1/cover.png`: no leading slash, no host. */
+/** A key on the CDN, e.g. `blog/<slug>/cover.webp`: no leading slash, no host. */
 export const cdnKey = z
   .string()
   .regex(
     /^(?!\/)(?!https?:)[\w\-./]+\.(png|jpe?g|webp|avif|gif|svg)$/,
-    "Use a CDN key like blog/<slug>/cover.png, not a URL or an absolute path.",
+    "Use a CDN key like blog/<slug>/cover.webp, not a URL or an absolute path.",
   );
 
 /** Sizes are required so images reserve their space and feed `og:image:width`/`height`. */
@@ -81,6 +81,12 @@ export const blogSchema = pageSchema.extend({
       version: z.string().regex(/^\d+\.\d+\.\d+(-[\w.]+)?$/),
       url: z.url().optional(),
     })
+    .optional(),
+
+  /** Playground categories the post embeds with `<Playground />`; their code is loaded with it. */
+  playground: z
+    .array(z.enum(["redis", "emails"]))
+    .max(2)
     .optional(),
 
   featured: z.boolean().default(false),

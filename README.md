@@ -43,18 +43,24 @@ authors: [vedant]
 category: release # announcement | release | guide | engineering
 tags: [release, redis]
 package: redis # optional: the post's accent and docs link
+playground: [redis, emails] # optional: enables <Playground /> in the post
 cover: # optional: without it the post gets a drawn cover
-  src: blog/redis-0-1-1/cover.png
+  src: blog/redis-0-1-1/cover.webp
   alt: What the image shows
   width: 2400
   height: 1260
 ---
 ```
 
-Images are keys on `https://cdn.effectkit.dev` (an R2 bucket), never full URLs. Put a post's
-assets under `blog/<slug>/` and avatars under `authors/`. Covers are 1200 × 630 shown at 2×, so
-upload them at 2400 × 1260; `og` (same shape as `cover`) overrides the generated Open Graph
-image. `draft: true` shows a post in development only.
+Images are WebP keys on `https://cdn.effectkit.dev` (an R2 bucket), never full URLs. A post's
+assets live under `blog/<slug>/`: `cover.webp` (2400 × 1260, shown at 1200 × 630), an optional
+`og.webp` that overrides the generated Open Graph image, and numbered images `1.webp`, `2.webp`…
+Avatars live under `authors/`. `draft: true` shows a post in development only.
+
+Besides the docs components, posts can use `<PostImage n={1} alt="…" width={…} height={…} />`
+for `blog/<slug>/1.webp`, the interactive figures `<RedisWrite />`, `<EmailsGate />` and
+`<SwapLayer />` (each takes a `caption`), and `<Playground />` with `playground` set in the
+frontmatter.
 
 ## Deployment
 

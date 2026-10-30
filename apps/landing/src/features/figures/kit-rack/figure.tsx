@@ -37,14 +37,21 @@ html:not(.dark) .kr .kr-cable-shine{stroke:var(--anatomy-top)}
 }
 `;
 
-export function KitRackFigure({ className }: { className?: string | undefined }) {
+export function KitRackFigure({
+  className,
+  fig = "Fig 1",
+}: {
+  className?: string | undefined;
+  /** Label in the top-left corner; posts number their figures. */
+  fig?: string;
+}) {
   return (
     <div className={cn("iso kr", className)}>
       <style href="kit-rack-figure" precedence="default">
         {CSS}
       </style>
       <Plate
-        fig="Fig 1"
+        fig={fig}
         title="Swap the Layer"
         hint="Turn a knob to swap its Layer"
         readout={

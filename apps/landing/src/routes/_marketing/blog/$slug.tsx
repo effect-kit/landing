@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { PostPage } from "@/components/blog/post-page";
+import { playgroundExampleIds, visualCode } from "@/features/visual";
 import { categoryLabels } from "@/lib/blog/format";
 import { loadBlogPost } from "@/lib/blog/loaders";
 import { blogPostingLd } from "@/lib/blog/seo";
@@ -13,9 +14,15 @@ export const Route = createFileRoute("/_marketing/blog/$slug")({
   loader: async ({ params }) => {
     const data = await loadBlogPost({ data: params.slug });
 
-    await blog.getPage(data.path)?.preload();
+    // Posts that embed the playground ship its highlighted code, like the landing pages.
+    const [visual] = await Promise.all([
+      data.playground.length > 0
+        ? visualCode({ data: playgroundExampleIds(data.playground) })
+        : undefined,
+      blog.getPage(data.path)?.preload(),
+    ]);
 
-    return data;
+    return { ...data, visual };
   },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
@@ -67,5 +74,7 @@ export const Route = createFileRoute("/_marketing/blog/$slug")({
 });
 
 function Page() {
-  return <PostPage data={Route.useLoaderData()} />;
+  const { visual, ...data } = Route.useLoaderData();
+
+  return <PostPage data={data} visual={visual} />;
 }

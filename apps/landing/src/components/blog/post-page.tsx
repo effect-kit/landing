@@ -8,6 +8,7 @@ import { DocsBody } from "fumadocs-ui/layouts/spacious/page";
 
 import { Container } from "@/components/marketing/section";
 import { useMDXComponents } from "@/components/mdx";
+import type { VisualCode } from "@/features/visual";
 import { track } from "@/lib/analytics/client";
 import { categoryLabels, formatDate, readingTime, tagLabels } from "@/lib/blog/format";
 import type { BlogPostData } from "@/lib/blog/loaders";
@@ -18,6 +19,7 @@ import { blog } from "@/lib/source";
 
 import { Byline } from "./authors";
 import { PostGrid } from "./blog-index";
+import { blogMdxComponents, PostEmbedsContext } from "./embeds";
 import { PostCover } from "./post-cover";
 import { ReadingProgress } from "./reading-progress";
 import { ShareLinks } from "./share";
@@ -40,7 +42,7 @@ function Body({ path }: { readonly path: string }) {
 
   return (
     <DocsBody className="ek-blog-prose">
-      <MDX components={useMDXComponents()} />
+      <MDX components={{ ...useMDXComponents(), ...blogMdxComponents }} />
     </DocsBody>
   );
 }
@@ -191,8 +193,15 @@ function Adjacent({
  * A blog post: header with byline, the cover, then the body beside a sticky column with the
  * table of contents, sharing and links. Older and newer posts and related reading follow.
  */
-export function PostPage({ data }: { readonly data: BlogPostData }) {
-  const { post, path, newer, older, related, series } = data;
+export function PostPage({
+  data,
+  visual,
+}: {
+  readonly data: BlogPostData;
+  /** Playground code tokens, when the post embeds the playground. */
+  readonly visual?: VisualCode | undefined;
+}) {
+  const { post, path, newer, older, related, series, playground } = data;
   const article = useRef<HTMLElement>(null);
 
   return (
@@ -270,9 +279,11 @@ export function PostPage({ data }: { readonly data: BlogPostData }) {
         <Container className="grid max-w-[1120px] gap-12 pt-12 pb-16 md:pt-16 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16">
           <div className="min-w-0">
             {series ? <SeriesBox data={series} /> : null}
-            <Suspense>
-              <Body path={path} />
-            </Suspense>
+            <PostEmbedsContext value={{ slug: post.slug, playground, visual }}>
+              <Suspense>
+                <Body path={path} />
+              </Suspense>
+            </PostEmbedsContext>
 
             <footer className="mt-14 flex flex-col gap-6 border-t border-(--ek-line) pt-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

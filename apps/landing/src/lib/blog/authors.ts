@@ -14,7 +14,7 @@ export const authors = {
   vedant: {
     name: "Vedant Chainani",
     role: "Maintainer",
-    avatar: "authors/vedant.png",
+    avatar: "authors/vedant.webp",
     url: "https://envoy1084.xyz",
     x: "envoy1084",
     github: "envoy1084",

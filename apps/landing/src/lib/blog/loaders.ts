@@ -44,6 +44,7 @@ export const loadBlogPost = createServerFn({ method: "GET" })
       post: await summarizePost(page),
       image: postImage(page, blogImageUrl(slug)),
       seo: page.data.seo ?? {},
+      playground: page.data.playground ?? [],
       newer: newer ? await summarizePost(newer) : undefined,
       older: older ? await summarizePost(older) : undefined,
       related: await Promise.all(relatedPages(page, pages).map(summarizePost)),
